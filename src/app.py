@@ -7,13 +7,37 @@ app = Flask(__name__)
 @app.route("/")
 def main():
     return '''
-     <form action="/echo_user_input" method="POST">
-         <input name="user_input">
-         <input type="submit" value="Submit!">
+     <form action="/plan" method="POST">
+         <label>Start address:</label>
+         <input name="start_address">
+         <br/>
+         <label>Transfer address:</label>
+         <input name="transfer_address">
+         <br/>
+         <label>Destination address:</label>
+         <input name="destination_address">
+         <br/>
+         <label>Drive mode:</label>
+         <label><input type="radio" name="drive_mode" value="first" checked> First</label>
+         <label><input type="radio" name="drive_mode" value="second"> Second</label>
+         <br/>
+         <input type="submit" value="Plan">
+     '''
+
+@app.route("/plan", methods=["POST"])
+def plan():
+    return '''
+     <p>Planning in process</p>
+     <form method="GET" action="/plan">
+         <input type="submit" value="Refresh">
      </form>
      '''
 
-@app.route("/echo_user_input", methods=["POST"])
-def echo_input():
-    input_text = request.form.get("user_input", "")
-    return "You entered: " + input_text
+@app.route("/plan", methods=["GET"])
+def plan_refresh():
+    return '''
+     <p>Planning in process</p>
+     <form method="GET" action="/plan">
+         <input type="submit" value="Refresh">
+     </form>
+     '''
