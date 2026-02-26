@@ -11,6 +11,8 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 url = os.getenv("DATABASE_URL")
+if url and url.startswith("postgres://"):
+    url = url.replace("postgres://", "postgresql://", 1)
 if url:
     config.set_main_option("sqlalchemy.url", url)
 
