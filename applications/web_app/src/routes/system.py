@@ -83,13 +83,61 @@ def _check_database() -> tuple[bool, str | None]:
 
 
 def _check_redis() -> tuple[bool, str | None]:
-    redis_url = os.getenv("REDIS_URL", f"redis://{os.getenv('REDIS_HOST', 'redis')}:{os.getenv('REDIS_PORT', '6379')}/0")
+    redis_url = metrics_store.redis_url
     try:
         client = redis.Redis.from_url(redis_url)
         client.ping()
         return True, None
     except Exception as exc:
         return False, str(exc)
+
+
+def _get_route_plan_db_snapshot() -> dict[str, object]:
+    try:
+        with engine.connect() as conn:
+            total = int(conn.execute(text("SELECT COUNT(*) FROM route_tasks")).scalar_one())
+            pending = int(
+                conn.execute(text("SELECT COUNT(*) FROM route_tasks WHERE status = 'PENDING'"))
+                .scalar_one()
+            )
+            processing = int(
+                conn.execute(text("SELECT COUNT(*) FROM route_tasks WHERE status = 'PROCESSING'"))
+                .scalar_one()
+            )
+            success = int(
+                conn.execute(text("SELECT COUNT(*) FROM route_tasks WHERE status = 'SUCCESS'"))
+                .scalar_one()
+            )
+            failed = int(
+                conn.execute(text("SELECT COUNT(*) FROM route_tasks WHERE status = 'FAILED'"))
+                .scalar_one()
+            )
+
+            mode_rows = conn.execute(
+                text("SELECT mode, COUNT(*)::int AS count FROM route_tasks GROUP BY mode")
+            ).mappings()
+            by_mode = {"drive": 0, "transit": 0, "mixed": 0}
+            for row in mode_rows:
+                mode = str(row["mode"]) if row["mode"] is not None else ""
+                if mode in by_mode:
+                    by_mode[mode] = int(row["count"])
+
+        return {
+            "available": True,
+            "total": total,
+            "by_status": {
+                "pending": pending,
+                "processing": processing,
+                "success": success,
+                "failed": failed,
+            },
+            "by_mode": by_mode,
+        }
+    except Exception as exc:
+        return {
+            "available": False,
+            "error": str(exc),
+        }
 
 
 def _check_rabbitmq() -> tuple[bool, str | None]:
@@ -133,11 +181,17 @@ def healthcheck():
 @system_routes.route("/metrics", methods=["GET"])
 def metrics():
     all_metrics = metrics_store.get_all()
+    backend_status = metrics_store.get_backend_status()
+    db_snapshot = _get_route_plan_db_snapshot()
+
+    created_total = all_metrics.get("route_plans.created_total", 0)
+    requests_total = all_metrics.get("route_plans.requests_total", 0)
+    db_total = db_snapshot.get("total", 0) if db_snapshot.get("available") else 0
 
     payload = {
         "route_plans": {
-            "requests_total": all_metrics.get("route_plans.requests_total", 0),
-            "created_total": all_metrics.get("route_plans.created_total", 0),
+            "requests_total": requests_total,
+            "created_total": created_total,
             "validation_failed_total": all_metrics.get("route_plans.validation_failed_total", 0),
             "query_total": all_metrics.get("route_plans.query_total", 0),
             "analysis_cache_hit_total": all_metrics.get("route_plans.analysis_cache_hit_total", 0),
@@ -147,6 +201,15 @@ def metrics():
                 "transit": all_metrics.get("route_plans.mode.transit_total", 0),
                 "mixed": all_metrics.get("route_plans.mode.mixed_total", 0),
             },
+        },
+        "diagnostics": {
+            "metrics_backend": backend_status,
+            "db_snapshot": db_snapshot,
+            "suspected_metrics_pipeline_issue": bool(
+                db_snapshot.get("available")
+                and db_total > 0
+                and created_total == 0
+            ),
         },
         "raw": all_metrics,
     }
