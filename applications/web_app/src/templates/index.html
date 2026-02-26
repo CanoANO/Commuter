@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Commuter</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 32px;
+        }
+        
+        .description {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+            font-size: 14px;
+        }
+        
+        input[type="text"],
+        input[type="datetime-local"] {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        
+        input[type="text"]:focus,
+        input[type="datetime-local"]:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .radio-group {
+            display: flex;
+            gap: 20px;
+            margin-top: 8px;
+        }
+        
+        .radio-group label {
+            margin-bottom: 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 400;
+        }
+        
+        input[type="radio"] {
+            cursor: pointer;
+        }
+        
+        .note {
+            background: #f0f4ff;
+            border-left: 3px solid #667eea;
+            padding: 10px 12px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            color: #555;
+            border-radius: 4px;
+        }
+        
+        .submit-btn {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        .submit-btn:active {
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Commuter</h1>
+        <p class="description">A mixed commute route planner</p>
+        
+        <form id="routeForm">
+            <div class="form-group">
+                <label for="startAddress">Start Address *</label>
+                <input type="text" id="startAddress" name="start_address" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="transferAddress">Transfer Address</label>
+                <input type="text" id="transferAddress" name="transfer_address">
+            </div>
+            
+            <div class="form-group">
+                <label for="destinationAddress">Destination Address *</label>
+                <input type="text" id="destinationAddress" name="destination_address" required>
+            </div>
+
+            <div class="form-group">
+                <label>Mode *</label>
+                <div class="radio-group">
+                    <label>
+                        <input type="radio" name="mode" value="drive" checked> Drive
+                    </label>
+                    <label>
+                        <input type="radio" name="mode" value="transit"> Transit
+                    </label>
+                    <label>
+                        <input type="radio" name="mode" value="mixed"> Mixed
+                    </label>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>Drive Part *</label>
+                <div class="radio-group">
+                    <label>
+                        <input type="radio" name="drive_part" value="first" checked> First
+                    </label>
+                    <label>
+                        <input type="radio" name="drive_part" value="second"> Second
+                    </label>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="arriveTime">Arrive Time (Optional)</label>
+                <input type="datetime-local" id="arriveTime" name="arrive_time">
+                <div class="note">Empty arrive time will use current time as default start time</div>
+            </div>
+            
+            <button type="submit" class="submit-btn">Submit</button>
+        </form>
+    </div>
+    
+    <script>
+        const form = document.getElementById('routeForm');
+        const transferInput = document.getElementById('transferAddress');
+
+        function syncTransferRequirement() {
+            const selectedMode = document.querySelector('input[name="mode"]:checked')?.value;
+            transferInput.required = selectedMode === 'mixed';
+        }
+
+        document.querySelectorAll('input[name="mode"]').forEach((el) => {
+            el.addEventListener('change', syncTransferRequirement);
+        });
+
+        syncTransferRequirement();
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData(form);
+            const mode = formData.get('mode');
+            const startAddress = (formData.get('start_address') || '').toString().trim();
+            const transferAddress = (formData.get('transfer_address') || '').toString().trim();
+            const destinationAddress = (formData.get('destination_address') || '').toString().trim();
+            const arriveTimeRaw = (formData.get('arrive_time') || '').toString().trim();
+            let arriveTime = null;
+
+            if (arriveTimeRaw) {
+                const localDate = new Date(arriveTimeRaw);
+                if (!Number.isNaN(localDate.getTime())) {
+                    arriveTime = localDate.toISOString();
+                } else {
+                    arriveTime = arriveTimeRaw;
+                }
+            }
+
+            if (!startAddress || !destinationAddress) {
+                alert('Start address and destination address are required');
+                return;
+            }
+
+            if (mode === 'mixed' && !transferAddress) {
+                alert('Transfer address is required for mixed mode');
+                return;
+            }
+
+            const data = {
+                start_address: startAddress,
+                transfer_address: transferAddress || null,
+                destination_address: destinationAddress,
+                drive_part: formData.get('drive_part'),
+                arrive_time: arriveTime,
+                mode: mode || 'drive'
+            };
+            
+            try {
+                const response = await fetch('/route-plans', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    window.location.href = `/route-plans/${result.task_id}`;
+                } else {
+                    let message = 'Error submitting form';
+                    try {
+                        const err = await response.json();
+                        message = err.error || err.message || message;
+                    } catch {
+                        const text = await response.text();
+                        if (text) {
+                            message = text;
+                        }
+                    }
+                    alert(message);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error submitting form');
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Route Plan - Commuter</title>
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+        crossorigin=""
+    >
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 880px;
+            width: 100%;
+        }
+        
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 30px;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        h1 {
+            color: #333;
+            font-size: 28px;
+        }
+        
+        .refresh-btn {
+            padding: 8px 16px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+        
+        .refresh-btn:hover {
+            background: #764ba2;
+        }
+
+        .toggle-all-btn {
+            padding: 8px 16px;
+            background: #4b5563;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+
+        .toggle-all-btn:hover {
+            background: #374151;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-bottom: 20px;
+        }
+        
+        .status-pending,
+        .status-processing {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .status-success {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-failed {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px 20px;
+        }
+        
+        .spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .loading-text {
+            color: #666;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+        
+        .result-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 12px;
+            margin: 14px 0 18px 0;
+        }
+
+        .summary-item {
+            background: white;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 12px;
+        }
+
+        .summary-label {
+            color: #6c757d;
+            font-size: 12px;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .summary-value {
+            color: #212529;
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .segment-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 14px;
+        }
+
+        .segment-card {
+            background: #fff;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .segment-header {
+            padding: 14px;
+            cursor: pointer;
+            user-select: none;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .segment-header:hover {
+            background: #f8fafc;
+        }
+
+        .segment-body {
+            padding: 0 14px 14px 14px;
+            border-top: 1px solid #eef2f7;
+        }
+
+        .segment-card.collapsed .segment-body {
+            display: none;
+        }
+
+        .segment-toggle {
+            font-size: 18px;
+            color: #4b5563;
+            font-weight: 700;
+        }
+
+        .segment-title {
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 8px;
+        }
+
+        .segment-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            color: #4b5563;
+            font-size: 14px;
+        }
+
+        .timeline-list {
+            margin-top: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .timeline-item {
+            display: grid;
+            grid-template-columns: 170px 1fr;
+            gap: 10px;
+            background: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 10px;
+            font-size: 13px;
+            color: #374151;
+        }
+
+        .timeline-time {
+            font-weight: 700;
+            color: #111827;
+        }
+
+        .timeline-label {
+            color: #1f2937;
+        }
+
+        .transit-section {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .transit-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #111827;
+            margin-bottom: 10px;
+        }
+
+        .transit-step {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 8px;
+        }
+
+        .transit-step-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            margin-bottom: 6px;
+        }
+
+        .vehicle-chip {
+            background: #dcfce7;
+            color: #166534;
+            border-radius: 999px;
+            padding: 2px 8px;
+            font-weight: 700;
+            font-size: 11px;
+        }
+
+        .transit-line {
+            font-weight: 700;
+            color: #1e3a8a;
+        }
+
+        .transit-step-meta {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 8px;
+            color: #374151;
+            font-size: 13px;
+        }
+
+        .mode-chip {
+            display: inline-block;
+            font-size: 12px;
+            font-weight: 700;
+            color: #4338ca;
+            background: #e0e7ff;
+            border-radius: 999px;
+            padding: 3px 10px;
+            margin-left: 8px;
+        }
+
+        #routeMap {
+            width: 100%;
+            height: 380px;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+            margin-top: 8px;
+        }
+
+        .section-title {
+            margin-bottom: 8px;
+            color: #111827;
+        }
+        
+        .result-json {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 15px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.5;
+            color: #333;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .error-section {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+        
+        .error-message {
+            margin-bottom: 15px;
+        }
+        
+        .retry-btn {
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+            margin-top: 10px;
+        }
+        
+        .retry-btn:hover {
+            background: #764ba2;
+        }
+        
+        .back-link {
+            color: #667eea;
+            text-decoration: none;
+            font-size: 14px;
+            display: inline-block;
+            margin-top: 20px;
+        }
+        
+        .back-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Route Plan</h1>
+            <div class="header-actions">
+                <button id="toggleAllBtn" class="toggle-all-btn" style="display:none;">Expand all</button>
+                <button class="refresh-btn" onclick="location.reload()">Refresh</button>
+            </div>
+        </div>
+        
+        <div id="status"></div>
+        <div id="content"></div>
+        <a href="/" class="back-link">← Back to Home</a>
+    </div>
+    <script
+        src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+        crossorigin=""
+    ></script>
+    
+    <script>
+        const taskId = '{{ task_id }}';
+        let routeMap = null;
+        let polylineLayers = [];
+        let segmentPointSets = [];
+
+        function formatDateTime(dateStr) {
+            if (!dateStr) return '-';
+            const date = new Date(dateStr);
+            if (Number.isNaN(date.getTime())) return dateStr;
+            return date.toLocaleString([], {
+                month: 'short',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        function renderTransitSection(transitSteps = []) {
+            if (!transitSteps.length) return '';
+
+            const rows = transitSteps.map((detail) => {
+                const departStop = detail?.from_stop || '-';
+                const arriveStop = detail?.to_stop || '-';
+                const departTime = formatDateTime(detail?.departure_time);
+                const arriveTime = formatDateTime(detail?.arrival_time);
+                const stopCount = detail?.stop_count ?? '-';
+                const vehicleName = detail?.vehicle || 'Transit';
+                const lineName = detail?.line || 'Line';
+
+                return `
+                    <div class="transit-step">
+                        <div class="transit-step-header">
+                            <span class="vehicle-chip">${vehicleName}</span>
+                            <span class="transit-line">${lineName}</span>
+                        </div>
+                        <div class="transit-step-meta">
+                            <div><strong>From:</strong> ${departStop}</div>
+                            <div><strong>To:</strong> ${arriveStop}</div>
+                            <div><strong>Departure:</strong> ${departTime}</div>
+                            <div><strong>Arrival:</strong> ${arriveTime}</div>
+                            <div><strong>Stops:</strong> ${stopCount}</div>
+                            <div><strong>Headsign:</strong> ${detail?.headsign || '-'}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            return `
+                <div class="transit-section">
+                    <div class="transit-title">Transit Details</div>
+                    ${rows}
+                </div>
+            `;
+        }
+
+        function decodePolyline(encoded) {
+            if (!encoded) return [];
+            let index = 0;
+            const coordinates = [];
+            let lat = 0;
+            let lng = 0;
+
+            while (index < encoded.length) {
+                let shift = 0;
+                let result = 0;
+                let byte = null;
+
+                do {
+                    byte = encoded.charCodeAt(index++) - 63;
+                    result |= (byte & 0x1f) << shift;
+                    shift += 5;
+                } while (byte >= 0x20);
+
+                const deltaLat = (result & 1) ? ~(result >> 1) : (result >> 1);
+                lat += deltaLat;
+
+                shift = 0;
+                result = 0;
+
+                do {
+                    byte = encoded.charCodeAt(index++) - 63;
+                    result |= (byte & 0x1f) << shift;
+                    shift += 5;
+                } while (byte >= 0x20);
+
+                const deltaLng = (result & 1) ? ~(result >> 1) : (result >> 1);
+                lng += deltaLng;
+
+                coordinates.push([lat / 1e5, lng / 1e5]);
+            }
+
+            return coordinates;
+        }
+
+        function renderMap(segments) {
+            const allPoints = [];
+            const colorPalette = ['#2563eb', '#10b981', '#ef4444', '#8b5cf6'];
+            segmentPointSets = [];
+
+            if (!routeMap) {
+                routeMap = L.map('routeMap');
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: '&copy; OpenStreetMap contributors'
+                }).addTo(routeMap);
+            }
+
+            polylineLayers.forEach((layer) => routeMap.removeLayer(layer));
+            polylineLayers = [];
+
+            segments.forEach((segment, index) => {
+                const firstRoute = segment?.route?.routes?.[0];
+                const encoded = firstRoute?.polyline?.encodedPolyline;
+                const points = decodePolyline(encoded);
+                segmentPointSets[index] = points;
+                if (!points.length) return;
+
+                allPoints.push(...points);
+                const color = colorPalette[index % colorPalette.length];
+                const polyline = L.polyline(points, {
+                    color,
+                    weight: 5,
+                    opacity: 0.9,
+                }).addTo(routeMap);
+
+                polyline.bindPopup(`${segment.from} → ${segment.to} (${segment.travel_mode || '-'})`);
+                polylineLayers.push(polyline);
+            });
+
+            if (allPoints.length) {
+                routeMap.fitBounds(L.latLngBounds(allPoints), { padding: [20, 20] });
+            } else {
+                routeMap.setView([43.6532, -79.3832], 11);
+            }
+        }
+
+        function focusSegmentOnMap(index) {
+            if (!routeMap) return;
+            const points = segmentPointSets[index] || [];
+            if (!points.length) return;
+            routeMap.fitBounds(L.latLngBounds(points), { padding: [20, 20] });
+        }
+
+        function updateToggleAllButtonText() {
+            const btn = document.getElementById('toggleAllBtn');
+            if (!btn) return;
+            const cards = Array.from(document.querySelectorAll('[data-segment-index]'));
+            if (!cards.length) {
+                btn.style.display = 'none';
+                return;
+            }
+            btn.style.display = 'inline-block';
+            const hasCollapsed = cards.some((card) => card.classList.contains('collapsed'));
+            btn.textContent = hasCollapsed ? 'Expand all' : 'Collapse all';
+        }
+
+        function toggleAllSegments() {
+            const cards = Array.from(document.querySelectorAll('[data-segment-index]'));
+            if (!cards.length) return;
+            const shouldExpandAll = cards.some((card) => card.classList.contains('collapsed'));
+            cards.forEach((card, idx) => {
+                if (shouldExpandAll) {
+                    card.classList.remove('collapsed');
+                } else {
+                    card.classList.add('collapsed');
+                }
+                const toggle = card.querySelector('.segment-toggle');
+                if (toggle) {
+                    toggle.textContent = card.classList.contains('collapsed') ? '+' : '−';
+                }
+                if (idx === 0) {
+                    focusSegmentOnMap(idx);
+                }
+            });
+            updateToggleAllButtonText();
+        }
+
+        function renderSuccess(data) {
+            const contentDiv = document.getElementById('content');
+            const segments = Array.isArray(data?.result?.segments) ? data.result.segments : [];
+            const analysis = data?.analysis || {};
+            const summary = analysis?.summary || {};
+            const segmentDetails = Array.isArray(analysis?.segments) ? analysis.segments : [];
+            const validSegmentCount = segments.filter((segment) => {
+                const route = segment?.route?.routes?.[0] || {};
+                return Object.keys(route).length > 0;
+            }).length;
+
+            const segmentCards = segmentDetails.map((segmentDetail, index) => {
+                const timeline = Array.isArray(segmentDetail?.timeline) ? segmentDetail.timeline : [];
+                const timelineRows = timeline.map((item) => `
+                    <div class="timeline-item">
+                        <div class="timeline-time">${item.time_text || '-'}</div>
+                        <div class="timeline-label">${item.label}</div>
+                    </div>
+                `).join('');
+
+                return `
+                    <div class="segment-card ${index === 0 ? '' : 'collapsed'}" data-segment-index="${index}">
+                        <div class="segment-header" data-segment-header="${index}">
+                            <div class="segment-title">
+                                Segment ${index + 1}: ${segmentDetail.from || '-'} → ${segmentDetail.to || '-'}
+                                <span class="mode-chip">${segmentDetail.travel_mode || '-'}</span>
+                            </div>
+                            <span class="segment-toggle">${index === 0 ? '−' : '+'}</span>
+                        </div>
+                        <div class="segment-body">
+                            <div class="segment-meta">
+                                <div><strong>Distance:</strong> ${segmentDetail.distance_text || '-'}</div>
+                                <div><strong>Total Duration:</strong> ${segmentDetail.duration_text || '-'}</div>
+                                ${segmentDetail.has_transit && segmentDetail.transit_ride_seconds > 0 ? `<div><strong>Transit Ride:</strong> ${segmentDetail.transit_ride_text || '-'}</div>` : ''}
+                                <div><strong>Walk:</strong> ${segmentDetail.walk_text || '-'}</div>
+                                ${segmentDetail.has_transit ? `<div><strong>Wait:</strong> ${segmentDetail.wait_text || '-'}</div>` : ''}
+                                ${segmentDetail.has_transit ? `<div><strong>Transfer:</strong> ${segmentDetail.transfer_text || '-'}</div>` : ''}
+                                <div><strong>Departure:</strong> ${formatDateTime(segmentDetail.departure_time)}</div>
+                                <div><strong>Arrival:</strong> ${formatDateTime(segmentDetail.arrival_time)}</div>
+                            </div>
+                            ${timelineRows ? `<div class="timeline-list">${timelineRows}</div>` : ''}
+                            ${segmentDetail.has_transit ? renderTransitSection(segmentDetail.transit_steps) : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            const transitSummaryItems = summary.has_transit ? `
+                        <div class="summary-item">
+                            <div class="summary-label">Transit Lines</div>
+                            <div class="summary-value">${summary.transit_lines ?? 0}</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-label">Transit Stops</div>
+                            <div class="summary-value">${summary.transit_stops ?? 0}</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-label">Wait Time</div>
+                            <div class="summary-value">${summary.wait_text || '-'}</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-label">Transfer Time</div>
+                            <div class="summary-value">${summary.transfer_text || '-'}</div>
+                        </div>
+            ` : '';
+
+            contentDiv.innerHTML = `
+                <div class="result-section">
+                    <h3 class="section-title">Route Summary</h3>
+                    <div class="summary-grid">
+                        <div class="summary-item">
+                            <div class="summary-label">Mode</div>
+                            <div class="summary-value">${summary.mode || '-'}</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-label">Segments</div>
+                            <div class="summary-value">${summary.segments ?? segmentDetails.length}</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-label">Total Distance</div>
+                            <div class="summary-value">${summary.total_distance_text || '-'}</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-label">Estimated Time</div>
+                            <div class="summary-value">${summary.total_duration_text || '-'}</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-label">Departure</div>
+                            <div class="summary-value">${formatDateTime(summary.departure_time)}</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-label">Arrival</div>
+                            <div class="summary-value">${formatDateTime(summary.arrival_time)}</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-label">Walk Time</div>
+                            <div class="summary-value">${summary.walk_text || '-'}</div>
+                        </div>
+                        ${transitSummaryItems}
+                    </div>
+                    <h3 class="section-title">Map</h3>
+                    <div id="routeMap"></div>
+                    <div class="segment-list">${segmentCards}</div>
+                    ${validSegmentCount === 0 ? '<p style="margin-top:12px;color:#b91c1c;">No route geometry returned by API.</p>' : ''}
+                </div>
+            `;
+
+            renderMap(segments);
+            document.querySelectorAll('[data-segment-header]').forEach((el) => {
+                el.addEventListener('click', () => {
+                    const idx = Number(el.getAttribute('data-segment-header'));
+                    const card = document.querySelector(`[data-segment-index="${idx}"]`);
+                    if (!card) return;
+                    const collapsed = card.classList.toggle('collapsed');
+                    const toggle = card.querySelector('.segment-toggle');
+                    if (toggle) {
+                        toggle.textContent = collapsed ? '+' : '−';
+                    }
+                    focusSegmentOnMap(idx);
+                    updateToggleAllButtonText();
+                });
+            });
+
+            const toggleAllBtn = document.getElementById('toggleAllBtn');
+            if (toggleAllBtn) {
+                toggleAllBtn.onclick = toggleAllSegments;
+            }
+            updateToggleAllButtonText();
+        }
+        
+        async function fetchStatus() {
+            try {
+                const response = await fetch(`/route-plans/${taskId}`, {
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                const data = await response.json();
+                
+                const statusDiv = document.getElementById('status');
+                const contentDiv = document.getElementById('content');
+                
+                statusDiv.innerHTML = `<div class="status-badge status-${data.status.toLowerCase()}">${data.status}</div>`;
+                
+                if (data.status === 'PENDING' || data.status === 'PROCESSING') {
+                    contentDiv.innerHTML = `
+                        <div class="loading">
+                            <div class="spinner"></div>
+                            <div class="loading-text">Planning your route...</div>
+                            <small>This may take a moment. The page will auto-refresh.</small>
+                        </div>
+                    `;
+                    setTimeout(fetchStatus, 3000);
+                } else if (data.status === 'SUCCESS') {
+                    renderSuccess(data);
+                } else if (data.status === 'FAILED') {
+                    contentDiv.innerHTML = `
+                        <div class="error-section">
+                            <div class="error-message">
+                                <strong>Route Planning Failed</strong>
+                                <p>${data.error_message || 'An error occurred while planning your route.'}</p>
+                            </div>
+                            <button class="retry-btn" onclick="window.location.href='/'">Try Again</button>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('content').innerHTML = '<div class="error-section">Error fetching status. Please refresh.</div>';
+            }
+        }
+        
+        fetchStatus();
+    </script>
+</body>
+</html>

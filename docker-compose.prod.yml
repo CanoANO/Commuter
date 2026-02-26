@@ -1,0 +1,72 @@
+services:
+  db:
+    restart: unless-stopped
+    ports: []
+
+  redis:
+    restart: unless-stopped
+    ports: []
+
+  rabbitmq:
+    restart: unless-stopped
+    ports: []
+
+  db_init:
+    env_file:
+      - ${ENV_FILE:-.env.prod}
+    volumes: []
+
+  web:
+    env_file:
+      - ${ENV_FILE:-.env.prod}
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes: []
+    command: gunicorn -b 0.0.0.0:8000 --workers ${WEB_GUNICORN_WORKERS:-4} --timeout ${WEB_GUNICORN_TIMEOUT:-120} --chdir /app/applications/web_app src.app:app
+
+  data_collector:
+    env_file:
+      - ${ENV_FILE:-.env.prod}
+    restart: unless-stopped
+    volumes: []
+
+  data_analyzer:
+    env_file:
+      - ${ENV_FILE:-.env.prod}
+    restart: unless-stopped
+    volumes: []
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: commuter_prometheus
+    restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_started
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: commuter_grafana
+    restart: unless-stopped
+    depends_on:
+      prometheus:
+        condition: service_started
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+
+volumes:
+  prometheus_data:
+  grafana_data:
