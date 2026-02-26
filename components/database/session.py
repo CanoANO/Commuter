@@ -10,6 +10,8 @@ from alembic.config import Config
 
 settings = get_database_settings()
 db_url = settings.DATABASE_URL
+if db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql://", 1)
 print(f"[DEBUG] Database URL: {db_url}")
 
 engine = create_engine(db_url, future=True, pool_pre_ping=True)

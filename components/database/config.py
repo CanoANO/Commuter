@@ -14,5 +14,4 @@ class DatabaseSettings(BaseSettings):
 
 def get_database_settings() -> DatabaseSettings:
     settings = DatabaseSettings()
-    print(f"[DEBUG] DatabaseSettings loaded - DATABASE_URL: {settings.DATABASE_URL}")
     return settings
