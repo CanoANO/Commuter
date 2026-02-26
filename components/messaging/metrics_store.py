@@ -16,6 +16,7 @@ class MetricsStore:
         self._local = defaultdict(int)
         self._lock = threading.Lock()
         self._last_redis_error: str | None = None
+        self._redis_client = self._build_client()
 
     @staticmethod
     def _resolve_redis_url() -> str:
@@ -26,8 +27,18 @@ class MetricsStore:
             or f"redis://{os.getenv('REDIS_HOST', 'redis')}:{os.getenv('REDIS_PORT', '6379')}/0"
         )
 
+    def _build_client(self):
+        parsed = urlparse(self.redis_url)
+        kwargs = {"decode_responses": True}
+
+        if parsed.scheme == "rediss":
+            ssl_mode = os.getenv("REDIS_SSL_CERT_REQS", "none").lower()
+            kwargs["ssl_cert_reqs"] = None if ssl_mode == "none" else ssl_mode
+
+        return redis.Redis.from_url(self.redis_url, **kwargs)
+
     def _client(self):
-        return redis.Redis.from_url(self.redis_url, decode_responses=True)
+        return self._redis_client
 
     def _set_redis_error(self, exc: Exception) -> None:
         self._last_redis_error = f"{type(exc).__name__}: {exc}"
