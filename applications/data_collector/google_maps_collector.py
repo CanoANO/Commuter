@@ -36,6 +36,18 @@ class GoogleMapsCollector:
         route = (route_payload or {}).get("routes", [{}])[0]
         return cls._parse_duration_seconds(route.get("duration"))
 
+    def _resolve_location(self, address_text: str | None) -> dict:
+        if not address_text or not address_text.strip():
+            return {}
+
+        normalized = address_text.strip()
+        cached = self.gateway.get_cached_coordinates(normalized)
+        if isinstance(cached, dict) and "lat" in cached and "lng" in cached:
+            logger.info("Using cached coordinates address='%s'", normalized)
+            return cached
+
+        return self.maps.geocode_address(normalized)
+
     def process_task(self, task_id: str) -> None:
         task = self.gateway.get_task_inputs(task_id)
         if not task:
@@ -57,10 +69,10 @@ class GoogleMapsCollector:
         try:
             start_text = task.get("start_text") or ""
             destination_text = task.get("destination_text") or ""
-            start_loc = self.maps.geocode_address(start_text)
-            dest_loc = self.maps.geocode_address(destination_text)
+            start_loc = self._resolve_location(start_text)
+            dest_loc = self._resolve_location(destination_text)
             transfer_text = task.get("transfer_text")
-            transfer_loc = self.maps.geocode_address(transfer_text) if transfer_text else None
+            transfer_loc = self._resolve_location(transfer_text) if transfer_text else None
             mode = (task.get("mode") or "drive").lower()
             drive_part = (task.get("drive_part") or "").lower() or None
             arrive_time = task.get("arrive_time")

@@ -3,6 +3,7 @@ import uuid
 import os
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
+from sqlalchemy import select, or_
 
 from components.database.session import SessionLocal
 from components.database.models import RouteTask, RouteResult, TaskStatus, TaskMode, DrivePart, Address
@@ -78,6 +79,30 @@ class RoutePlanGateway:
         except Exception:
             session.rollback()
             raise
+        finally:
+            session.close()
+
+    def get_cached_coordinates(self, address_text: str | None) -> dict | None:
+        if not address_text or not address_text.strip():
+            return None
+
+        normalized = address_text.strip()
+        session = SessionLocal()
+        try:
+            query = (
+                select(Address)
+                .where(
+                    Address.raw_text == normalized,
+                    or_(Address.lat != 0.0, Address.lng != 0.0),
+                )
+                .order_by(Address.id.desc())
+                .limit(1)
+            )
+            address = session.execute(query).scalars().first()
+            if not address:
+                return None
+
+            return {"lat": float(address.lat), "lng": float(address.lng)}
         finally:
             session.close()
 

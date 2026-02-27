@@ -106,3 +106,58 @@ def test_process_task_transit_uses_query_time_as_departure_time(collector_module
     assert kwargs["mode"] == "TRANSIT"
     assert kwargs["arrival_time"] is None
     assert kwargs["departure_time"] == query_time
+
+
+def test_process_task_uses_cached_coordinates_before_geocode(collector_module):
+    collector = collector_module.GoogleMapsCollector(api_key="x")
+
+    collector.gateway = MagicMock()
+    collector.maps = MagicMock()
+
+    collector.gateway.get_task_inputs.return_value = {
+        "task_id": "task-cache",
+        "start_text": "A",
+        "destination_text": "B",
+        "transfer_text": None,
+        "mode": "drive",
+        "drive_part": None,
+        "arrive_time": None,
+    }
+    collector.gateway.get_cached_coordinates.side_effect = [
+        {"lat": 10.0, "lng": 20.0},
+        {"lat": 30.0, "lng": 40.0},
+    ]
+    collector.maps.compute_route.return_value = {"routes": [{"duration": "120s"}]}
+
+    collector.process_task("task-cache")
+
+    collector.maps.geocode_address.assert_not_called()
+    collector.gateway.save_route_result.assert_called_once()
+
+
+def test_process_task_falls_back_to_geocode_when_cache_miss(collector_module):
+    collector = collector_module.GoogleMapsCollector(api_key="x")
+
+    collector.gateway = MagicMock()
+    collector.maps = MagicMock()
+
+    collector.gateway.get_task_inputs.return_value = {
+        "task_id": "task-cache-miss",
+        "start_text": "A",
+        "destination_text": "B",
+        "transfer_text": None,
+        "mode": "drive",
+        "drive_part": None,
+        "arrive_time": None,
+    }
+    collector.gateway.get_cached_coordinates.return_value = None
+    collector.maps.geocode_address.side_effect = [
+        {"lat": 1.0, "lng": 2.0},
+        {"lat": 3.0, "lng": 4.0},
+    ]
+    collector.maps.compute_route.return_value = {"routes": [{"duration": "120s"}]}
+
+    collector.process_task("task-cache-miss")
+
+    assert collector.maps.geocode_address.call_count == 2
+    collector.gateway.save_route_result.assert_called_once()
