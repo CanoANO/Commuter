@@ -38,8 +38,55 @@
         
         .description {
             color: #666;
-            margin-bottom: 30px;
+            margin-bottom: 16px;
             font-size: 14px;
+        }
+
+        .usage-card {
+            margin-bottom: 16px;
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 12px;
+        }
+
+        .usage-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #111827;
+            margin-bottom: 6px;
+        }
+
+        .usage-list {
+            margin-left: 18px;
+            color: #374151;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .usage-tip {
+            margin-top: 6px;
+            font-size: 12px;
+            color: #6b7280;
+        }
+
+        .global-message {
+            margin-bottom: 12px;
+            padding: 10px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+        }
+
+        .global-message.error {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #b91c1c;
+        }
+
+        .global-message.success {
+            background: #ecfdf5;
+            border: 1px solid #a7f3d0;
+            color: #065f46;
         }
 
         .history-section {
@@ -201,6 +248,13 @@
             color: #555;
             border-radius: 4px;
         }
+
+        .field-error {
+            margin-top: 6px;
+            min-height: 16px;
+            font-size: 12px;
+            color: #b91c1c;
+        }
         
         .submit-btn {
             width: 100%;
@@ -223,12 +277,31 @@
         .submit-btn:active {
             transform: translateY(0);
         }
+
+        .submit-btn:disabled {
+            opacity: 0.75;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Commuter</h1>
         <p class="description">A mixed commute route planner</p>
+
+        <div class="usage-card">
+            <div class="usage-title">How to use</div>
+            <ol class="usage-list">
+                <li>Enter <strong>Start Address</strong> and <strong>Destination Address</strong>.</li>
+                <li>Select <strong>Drive</strong>, <strong>Transit</strong>, or <strong>Mixed</strong>, then choose the drive part.</li>
+                <li>Click <strong>Submit</strong> to create a task and open the result page.</li>
+            </ol>
+            <div class="usage-tip">Note: <strong>Transfer Address</strong> is required in <strong>Mixed</strong> mode.</div>
+        </div>
+
+        <div id="globalMessage" class="global-message" style="display:none;"></div>
 
         <div class="history-section">
             <div class="history-header">
@@ -242,16 +315,19 @@
             <div class="form-group">
                 <label for="startAddress">Start Address *</label>
                 <input type="text" id="startAddress" name="start_address" required>
+                <div id="startAddressError" class="field-error"></div>
             </div>
             
             <div class="form-group">
                 <label for="transferAddress">Transfer Address</label>
                 <input type="text" id="transferAddress" name="transfer_address">
+                <div id="transferAddressError" class="field-error"></div>
             </div>
             
             <div class="form-group">
                 <label for="destinationAddress">Destination Address *</label>
                 <input type="text" id="destinationAddress" name="destination_address" required>
+                <div id="destinationAddressError" class="field-error"></div>
             </div>
 
             <div class="form-group">
@@ -285,6 +361,7 @@
                 <label for="arriveTime">Arrive Time (Optional)</label>
                 <input type="datetime-local" id="arriveTime" name="arrive_time">
                 <div class="note">Empty arrive time will use current time as default start time</div>
+                <div id="arriveTimeError" class="field-error"></div>
             </div>
             
             <button type="submit" class="submit-btn">Submit</button>
@@ -298,6 +375,41 @@
         const transferInput = document.getElementById('transferAddress');
         const historyList = document.getElementById('historyList');
         const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+        const globalMessage = document.getElementById('globalMessage');
+        const submitBtn = form.querySelector('.submit-btn');
+        const fieldErrors = {
+            start_address: document.getElementById('startAddressError'),
+            transfer_address: document.getElementById('transferAddressError'),
+            destination_address: document.getElementById('destinationAddressError'),
+            arrive_time: document.getElementById('arriveTimeError')
+        };
+
+        function showGlobalMessage(text, type = 'error') {
+            globalMessage.className = `global-message ${type}`;
+            globalMessage.textContent = text;
+            globalMessage.style.display = 'block';
+        }
+
+        function clearGlobalMessage() {
+            globalMessage.textContent = '';
+            globalMessage.style.display = 'none';
+        }
+
+        function setFieldError(key, message) {
+            const target = fieldErrors[key];
+            if (target) {
+                target.textContent = message || '';
+            }
+        }
+
+        function clearFieldErrors() {
+            Object.keys(fieldErrors).forEach((key) => setFieldError(key, ''));
+        }
+
+        function setSubmitting(isSubmitting) {
+            submitBtn.disabled = isSubmitting;
+            submitBtn.textContent = isSubmitting ? 'Submitting...' : 'Submit';
+        }
 
         function escapeHtml(value) {
             return String(value || '')
@@ -394,6 +506,8 @@
                 const item = items[Number(openIndex)];
                 if (item?.task_id) {
                     window.location.href = `/route-plans/${item.task_id}`;
+                } else {
+                    showGlobalMessage('This history item has no valid task id.');
                 }
                 return;
             }
@@ -405,8 +519,12 @@
         });
 
         clearHistoryBtn.addEventListener('click', () => {
+            if (!confirm('Are you sure you want to clear local history on this device?')) {
+                return;
+            }
             localStorage.removeItem(HISTORY_KEY);
             renderHistory();
+            showGlobalMessage('Local history cleared.', 'success');
         });
 
         syncTransferRequirement();
@@ -414,6 +532,9 @@
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
+            clearGlobalMessage();
+            clearFieldErrors();
+            setSubmitting(true);
             
             const formData = new FormData(form);
             const mode = formData.get('mode');
@@ -428,17 +549,29 @@
                 if (!Number.isNaN(localDate.getTime())) {
                     arriveTime = localDate.toISOString();
                 } else {
-                    arriveTime = arriveTimeRaw;
+                    setFieldError('arrive_time', 'Invalid arrive time format.');
+                    showGlobalMessage('Please provide a valid arrive time.');
+                    setSubmitting(false);
+                    return;
                 }
             }
 
+            if (!startAddress) {
+                setFieldError('start_address', 'Start address is required.');
+            }
+            if (!destinationAddress) {
+                setFieldError('destination_address', 'Destination address is required.');
+            }
             if (!startAddress || !destinationAddress) {
-                alert('Start address and destination address are required');
+                showGlobalMessage('Please fill in required fields.');
+                setSubmitting(false);
                 return;
             }
 
             if (mode === 'mixed' && !transferAddress) {
-                alert('Transfer address is required for mixed mode');
+                setFieldError('transfer_address', 'Transfer address is required in Mixed mode.');
+                showGlobalMessage('Please fill in required fields.');
+                setSubmitting(false);
                 return;
             }
 
@@ -481,11 +614,13 @@
                             message = text;
                         }
                     }
-                    alert(message);
+                    showGlobalMessage(message);
                 }
             } catch (error) {
                 console.error('Error:', error);
-                alert('Error submitting form');
+                showGlobalMessage('Network error. Please check your connection and try again.');
+            } finally {
+                setSubmitting(false);
             }
         });
     </script>
