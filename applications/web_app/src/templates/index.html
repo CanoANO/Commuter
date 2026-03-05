@@ -104,6 +104,26 @@
             margin-bottom: 10px;
         }
 
+        .history-controls {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .toggle-history-btn {
+            padding: 6px 10px;
+            background: #4f46e5;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .toggle-history-btn:hover {
+            background: #4338ca;
+        }
+
         .history-title {
             color: #374151;
             font-size: 14px;
@@ -128,6 +148,17 @@
             display: flex;
             flex-direction: column;
             gap: 8px;
+            max-height: 280px;
+            overflow-y: auto;
+            padding-right: 2px;
+        }
+
+        .history-section.collapsed .history-list {
+            display: none;
+        }
+
+        .history-section.collapsed .history-header {
+            margin-bottom: 0;
         }
 
         .history-empty {
@@ -306,7 +337,10 @@
         <div class="history-section">
             <div class="history-header">
                 <div class="history-title">Local History</div>
-                <button type="button" id="clearHistoryBtn" class="clear-history-btn">Clear History</button>
+                <div class="history-controls">
+                    <button type="button" id="toggleHistoryBtn" class="toggle-history-btn">Collapse</button>
+                    <button type="button" id="clearHistoryBtn" class="clear-history-btn">Clear History</button>
+                </div>
             </div>
             <div id="historyList" class="history-list"></div>
         </div>
@@ -373,7 +407,9 @@
         const HISTORY_MAX_ITEMS = 8;
         const form = document.getElementById('routeForm');
         const transferInput = document.getElementById('transferAddress');
+        const historySection = document.querySelector('.history-section');
         const historyList = document.getElementById('historyList');
+        const toggleHistoryBtn = document.getElementById('toggleHistoryBtn');
         const clearHistoryBtn = document.getElementById('clearHistoryBtn');
         const globalMessage = document.getElementById('globalMessage');
         const submitBtn = form.querySelector('.submit-btn');
@@ -409,6 +445,11 @@
         function setSubmitting(isSubmitting) {
             submitBtn.disabled = isSubmitting;
             submitBtn.textContent = isSubmitting ? 'Submitting...' : 'Submit';
+        }
+
+        function setHistoryCollapsed(collapsed) {
+            historySection.classList.toggle('collapsed', collapsed);
+            toggleHistoryBtn.textContent = collapsed ? 'Expand' : 'Collapse';
         }
 
         function escapeHtml(value) {
@@ -527,7 +568,13 @@
             showGlobalMessage('Local history cleared.', 'success');
         });
 
+        toggleHistoryBtn.addEventListener('click', () => {
+            const shouldCollapse = !historySection.classList.contains('collapsed');
+            setHistoryCollapsed(shouldCollapse);
+        });
+
         syncTransferRequirement();
+        setHistoryCollapsed(false);
         renderHistory();
 
         form.addEventListener('submit', async (e) => {
