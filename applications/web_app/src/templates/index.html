@@ -41,6 +41,109 @@
             margin-bottom: 30px;
             font-size: 14px;
         }
+
+        .history-section {
+            margin-bottom: 24px;
+            background: #f8faff;
+            border: 1px solid #e0e7ff;
+            border-radius: 8px;
+            padding: 12px;
+        }
+
+        .history-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .history-title {
+            color: #374151;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .clear-history-btn {
+            padding: 6px 10px;
+            background: #6b7280;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .clear-history-btn:hover {
+            background: #4b5563;
+        }
+
+        .history-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .history-empty {
+            color: #6b7280;
+            font-size: 12px;
+        }
+
+        .history-item {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            padding: 10px;
+        }
+
+        .history-main {
+            color: #111827;
+            font-size: 13px;
+            margin-bottom: 6px;
+            line-height: 1.4;
+        }
+
+        .history-meta {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .history-task {
+            color: #6b7280;
+            font-size: 11px;
+        }
+
+        .history-actions {
+            display: flex;
+            gap: 6px;
+        }
+
+        .history-btn {
+            padding: 5px 9px;
+            border: none;
+            border-radius: 5px;
+            font-size: 11px;
+            cursor: pointer;
+            color: white;
+        }
+
+        .history-btn-open {
+            background: #2563eb;
+        }
+
+        .history-btn-open:hover {
+            background: #1d4ed8;
+        }
+
+        .history-btn-reuse {
+            background: #059669;
+        }
+
+        .history-btn-reuse:hover {
+            background: #047857;
+        }
         
         .form-group {
             margin-bottom: 20px;
@@ -126,6 +229,14 @@
     <div class="container">
         <h1>Commuter</h1>
         <p class="description">A mixed commute route planner</p>
+
+        <div class="history-section">
+            <div class="history-header">
+                <div class="history-title">Local History</div>
+                <button type="button" id="clearHistoryBtn" class="clear-history-btn">Clear History</button>
+            </div>
+            <div id="historyList" class="history-list"></div>
+        </div>
         
         <form id="routeForm">
             <div class="form-group">
@@ -181,8 +292,91 @@
     </div>
     
     <script>
+        const HISTORY_KEY = 'commuter_route_history_v1';
+        const HISTORY_MAX_ITEMS = 8;
         const form = document.getElementById('routeForm');
         const transferInput = document.getElementById('transferAddress');
+        const historyList = document.getElementById('historyList');
+        const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+
+        function escapeHtml(value) {
+            return String(value || '')
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#39;');
+        }
+
+        function readHistory() {
+            try {
+                const raw = localStorage.getItem(HISTORY_KEY);
+                const data = raw ? JSON.parse(raw) : [];
+                return Array.isArray(data) ? data : [];
+            } catch {
+                return [];
+            }
+        }
+
+        function writeHistory(items) {
+            localStorage.setItem(HISTORY_KEY, JSON.stringify(items));
+        }
+
+        function saveHistory(entry) {
+            const items = readHistory().filter((item) => item.task_id !== entry.task_id);
+            items.unshift(entry);
+            writeHistory(items.slice(0, HISTORY_MAX_ITEMS));
+        }
+
+        function formatHistoryTime(value) {
+            if (!value) return '-';
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) return value;
+            return date.toLocaleString();
+        }
+
+        function renderHistory() {
+            const items = readHistory();
+            if (!items.length) {
+                historyList.innerHTML = '<div class="history-empty">No local history yet.</div>';
+                return;
+            }
+
+            historyList.innerHTML = items.map((item, index) => `
+                <div class="history-item">
+                    <div class="history-main">
+                        <strong>${escapeHtml(item.start_address)}</strong> →
+                        <strong>${escapeHtml(item.destination_address)}</strong>
+                        <span style="color:#4b5563;">(${escapeHtml(item.mode)})</span>
+                    </div>
+                    <div class="history-meta">
+                        <span class="history-task">Task: ${escapeHtml(item.task_id)} · ${escapeHtml(formatHistoryTime(item.created_at))}</span>
+                        <div class="history-actions">
+                            <button type="button" class="history-btn history-btn-open" data-history-open="${index}">Open</button>
+                            <button type="button" class="history-btn history-btn-reuse" data-history-reuse="${index}">Reuse</button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function setRadioValue(name, value) {
+            const option = document.querySelector(`input[name="${name}"][value="${value}"]`);
+            if (option) option.checked = true;
+        }
+
+        function reuseHistoryItem(index) {
+            const items = readHistory();
+            const item = items[index];
+            if (!item) return;
+
+            document.getElementById('startAddress').value = item.start_address || '';
+            document.getElementById('destinationAddress').value = item.destination_address || '';
+            document.getElementById('transferAddress').value = item.transfer_address || '';
+            setRadioValue('mode', item.mode || 'drive');
+            setRadioValue('drive_part', item.drive_part || 'first');
+            syncTransferRequirement();
+        }
 
         function syncTransferRequirement() {
             const selectedMode = document.querySelector('input[name="mode"]:checked')?.value;
@@ -193,7 +387,30 @@
             el.addEventListener('change', syncTransferRequirement);
         });
 
+        historyList.addEventListener('click', (event) => {
+            const openIndex = event.target.getAttribute('data-history-open');
+            if (openIndex !== null) {
+                const items = readHistory();
+                const item = items[Number(openIndex)];
+                if (item?.task_id) {
+                    window.location.href = `/route-plans/${item.task_id}`;
+                }
+                return;
+            }
+
+            const reuseIndex = event.target.getAttribute('data-history-reuse');
+            if (reuseIndex !== null) {
+                reuseHistoryItem(Number(reuseIndex));
+            }
+        });
+
+        clearHistoryBtn.addEventListener('click', () => {
+            localStorage.removeItem(HISTORY_KEY);
+            renderHistory();
+        });
+
         syncTransferRequirement();
+        renderHistory();
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -243,6 +460,15 @@
                 
                 if (response.ok) {
                     const result = await response.json();
+                    saveHistory({
+                        task_id: result.task_id,
+                        start_address: startAddress,
+                        destination_address: destinationAddress,
+                        transfer_address: transferAddress || '',
+                        mode: mode || 'drive',
+                        drive_part: formData.get('drive_part') || 'first',
+                        created_at: new Date().toISOString()
+                    });
                     window.location.href = `/route-plans/${result.task_id}`;
                 } else {
                     let message = 'Error submitting form';

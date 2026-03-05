@@ -83,6 +83,21 @@
         .toggle-all-btn:hover {
             background: #374151;
         }
+
+        .home-btn {
+            padding: 8px 16px;
+            background: #6b7280;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+
+        .home-btn:hover {
+            background: #4b5563;
+        }
         
         .status-badge {
             display: inline-block;
@@ -375,17 +390,6 @@
             background: #764ba2;
         }
         
-        .back-link {
-            color: #667eea;
-            text-decoration: none;
-            font-size: 14px;
-            display: inline-block;
-            margin-top: 20px;
-        }
-        
-        .back-link:hover {
-            text-decoration: underline;
-        }
     </style>
 </head>
 <body>
@@ -393,6 +397,7 @@
         <div class="header">
             <h1>Route Plan</h1>
             <div class="header-actions">
+                <button class="home-btn" onclick="window.location.href='/'">Back to Home</button>
                 <button id="toggleAllBtn" class="toggle-all-btn" style="display:none;">Expand all</button>
                 <button class="refresh-btn" onclick="location.reload()">Refresh</button>
             </div>
@@ -400,7 +405,6 @@
         
         <div id="status"></div>
         <div id="content"></div>
-        <a href="/" class="back-link">← Back to Home</a>
     </div>
     <script
         src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
