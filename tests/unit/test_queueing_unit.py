@@ -66,7 +66,7 @@ def test_publisher_declares_queue_and_publishes(monkeypatch):
             self.closed = True
 
     fake_conn = _FakeConnection()
-    monkeypatch.setattr(queueing, "_create_connection", lambda: fake_conn)
+    monkeypatch.setattr(queueing, "_create_connection", lambda is_publisher=False: fake_conn)
 
     publisher = queueing.RabbitMQPublisher()
     publisher.publish_json("route_tasks", {"task_id": "abc"})
