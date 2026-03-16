@@ -23,19 +23,7 @@ services:
     ports:
       - "8000:8000"
     volumes: []
-    command: gunicorn -b 0.0.0.0:8000 --workers ${WEB_GUNICORN_WORKERS:-4} --timeout ${WEB_GUNICORN_TIMEOUT:-120} --chdir /app/applications/web_app src.app:app
-
-  data_collector:
-    env_file:
-      - ${ENV_FILE:-.env.prod}
-    restart: unless-stopped
-    volumes: []
-
-  data_analyzer:
-    env_file:
-      - ${ENV_FILE:-.env.prod}
-    restart: unless-stopped
-    volumes: []
+    command: bash /app/scripts/start_all.sh
 
   prometheus:
     image: prom/prometheus:v2.54.1

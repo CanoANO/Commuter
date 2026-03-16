@@ -25,16 +25,4 @@ services:
       - "8000:8000"
     volumes:
       - .:/app
-    command: gunicorn -b 0.0.0.0:8000 --workers 2 --timeout 120 --chdir /app/applications/web_app src.app:app --reload
-
-  data_collector:
-    env_file:
-      - ${ENV_FILE:-.env.dev}
-    volumes:
-      - .:/app
-
-  data_analyzer:
-    env_file:
-      - ${ENV_FILE:-.env.dev}
-    volumes:
-      - .:/app
+    command: bash /app/scripts/start_all.sh
