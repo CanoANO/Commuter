@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Route Plan - Commuter</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link
         rel="stylesheet"
         href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -18,127 +19,140 @@
         }
         
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Inter', sans-serif;
+            background-color: #fafafa;
+            color: #111;
+            line-height: 1.6;
             min-height: 100vh;
+            padding-top: 60px;
+        }
+
+        .navbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background: #fff;
+            border-bottom: 1px solid #eaeaea;
             display: flex;
             align-items: center;
-            justify-content: center;
-            padding: 20px;
+            padding: 0 5%;
+            z-index: 1000;
         }
-        
+
+        .navbar-brand {
+            font-size: 18px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            color: #111;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
         .container {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            padding: 40px;
-            max-width: 880px;
             width: 100%;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
         }
         
         .header {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-bottom: 30px;
+            margin-bottom: 32px;
+            flex-wrap: wrap;
+            gap: 16px;
         }
 
         .header-actions {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 12px;
         }
         
         h1 {
-            color: #333;
-            font-size: 28px;
+            font-size: 24px;
+            font-weight: 600;
+            color: #111;
+            letter-spacing: -0.5px;
         }
-        
-        .refresh-btn {
+
+        .btn {
             padding: 8px 16px;
-            background: #667eea;
-            color: white;
-            border: none;
-            border-radius: 6px;
+            background: #fff;
+            color: #111;
+            border: 1px solid #ddd;
+            border-radius: 4px;
             cursor: pointer;
-            font-size: 14px;
-            transition: background 0.3s;
-        }
-        
-        .refresh-btn:hover {
-            background: #764ba2;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            text-align: center;
         }
 
-        .toggle-all-btn {
-            padding: 8px 16px;
-            background: #4b5563;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: background 0.3s;
+        .btn:hover {
+            border-color: #111;
+            background: #fafafa;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
         }
 
-        .toggle-all-btn:hover {
-            background: #374151;
+        .btn-primary {
+            background: #111;
+            color: #fff;
+            border-color: #111;
         }
 
-        .home-btn {
-            padding: 8px 16px;
-            background: #6b7280;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: background 0.3s;
-        }
-
-        .home-btn:hover {
-            background: #4b5563;
+        .btn-primary:hover {
+            background: #333;
+            border-color: #333;
         }
         
         .status-badge {
             display: inline-block;
             padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 13px;
+            border: 1px solid #111;
+            font-size: 11px;
             font-weight: 600;
             text-transform: uppercase;
-            margin-bottom: 20px;
+            letter-spacing: 1px;
+            margin-bottom: 24px;
         }
         
         .status-pending,
         .status-processing {
-            background: #fff3cd;
-            color: #856404;
+            background: #fff;
+            color: #111;
+            border-style: dashed;
         }
         
         .status-success {
-            background: #d4edda;
-            color: #155724;
+            background: #111;
+            color: #fff;
         }
         
         .status-failed {
-            background: #f8d7da;
-            color: #721c24;
+            background: #fff;
+            color: #111;
+            border-color: #999;
         }
         
         .loading {
             text-align: center;
-            padding: 40px 20px;
+            padding: 60px 20px;
         }
         
         .spinner {
             display: inline-block;
             width: 40px;
             height: 40px;
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #667eea;
+            border: 2px solid #eaeaea;
+            border-top: 2px solid #111;
             border-radius: 50%;
             animation: spin 1s linear infinite;
-            margin-bottom: 20px;
+            margin-bottom: 24px;
         }
         
         @keyframes spin {
@@ -147,77 +161,102 @@
         }
         
         .loading-text {
-            color: #666;
-            font-size: 16px;
-            margin-bottom: 10px;
+            color: #555;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        .loading small {
+            color: #888;
         }
         
         .result-section {
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 20px;
+            background: #fff;
+            padding: 32px;
+            border: 1px solid #eaeaea;
+            margin-bottom: 24px;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .result-section:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #111;
+            margin-bottom: 16px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         .summary-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-            gap: 12px;
-            margin: 14px 0 18px 0;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 16px;
+            margin: 24px 0;
         }
 
         .summary-item {
-            background: white;
-            border: 1px solid #e9ecef;
-            border-radius: 8px;
-            padding: 12px;
+            background: #fafafa;
+            border: 1px solid #eaeaea;
+            padding: 16px;
         }
 
         .summary-label {
-            color: #6c757d;
-            font-size: 12px;
-            margin-bottom: 6px;
+            color: #666;
+            font-size: 11px;
+            margin-bottom: 8px;
             text-transform: uppercase;
-            letter-spacing: 0.3px;
+            letter-spacing: 0.5px;
         }
 
         .summary-value {
-            color: #212529;
-            font-size: 18px;
-            font-weight: 700;
+            color: #111;
+            font-size: 16px;
+            font-weight: 600;
         }
 
         .segment-list {
             display: flex;
             flex-direction: column;
-            gap: 12px;
-            margin-top: 14px;
+            gap: 16px;
+            margin-top: 24px;
         }
 
         .segment-card {
             background: #fff;
-            border: 1px solid #e9ecef;
-            border-radius: 8px;
+            border: 1px solid #eaeaea;
             overflow: hidden;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .segment-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+            border-color: #ddd;
         }
 
         .segment-header {
-            padding: 14px;
+            padding: 20px;
             cursor: pointer;
             user-select: none;
             display: flex;
             align-items: center;
             justify-content: space-between;
             gap: 12px;
+            background: #fafafa;
+            border-bottom: 1px solid transparent;
         }
 
-        .segment-header:hover {
-            background: #f8fafc;
+        .segment-card:not(.collapsed) .segment-header {
+            border-bottom-color: #eaeaea;
         }
 
         .segment-body {
-            padding: 0 14px 14px 14px;
-            border-top: 1px solid #eef2f7;
+            padding: 20px;
         }
 
         .segment-card.collapsed .segment-body {
@@ -226,180 +265,162 @@
 
         .segment-toggle {
             font-size: 18px;
-            color: #4b5563;
-            font-weight: 700;
+            color: #666;
+            font-weight: 500;
         }
 
         .segment-title {
-            font-weight: 700;
-            color: #1f2937;
-            margin-bottom: 8px;
+            font-weight: 600;
+            color: #111;
+            font-size: 14px;
+            line-height: 1.5;
         }
 
         .segment-meta {
             display: flex;
             flex-wrap: wrap;
-            gap: 16px;
-            color: #4b5563;
-            font-size: 14px;
+            gap: 20px;
+            color: #555;
+            font-size: 13px;
         }
 
         .timeline-list {
-            margin-top: 10px;
+            margin-top: 20px;
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 12px;
         }
 
         .timeline-item {
             display: grid;
-            grid-template-columns: 170px 1fr;
-            gap: 10px;
-            background: #ffffff;
-            border: 1px solid #e5e7eb;
-            border-radius: 8px;
-            padding: 10px;
+            grid-template-columns: 140px 1fr;
+            gap: 16px;
+            background: #fafafa;
+            border: 1px solid #eaeaea;
+            padding: 12px 16px;
             font-size: 13px;
-            color: #374151;
+            color: #555;
         }
 
         .timeline-time {
-            font-weight: 700;
-            color: #111827;
+            font-weight: 600;
+            color: #111;
         }
 
         .timeline-label {
-            color: #1f2937;
+            color: #111;
         }
 
         .transit-section {
-            margin-top: 12px;
-            padding-top: 12px;
-            border-top: 1px solid #e5e7eb;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #eaeaea;
         }
 
         .transit-title {
-            font-size: 14px;
-            font-weight: 700;
-            color: #111827;
-            margin-bottom: 10px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #111;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 12px;
         }
 
         .transit-step {
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            padding: 10px;
-            margin-bottom: 8px;
+            background: #fff;
+            border: 1px solid #eaeaea;
+            padding: 16px;
+            margin-bottom: 12px;
         }
 
         .transit-step-header {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 12px;
             font-size: 13px;
-            margin-bottom: 6px;
+            margin-bottom: 12px;
         }
 
         .vehicle-chip {
-            background: #dcfce7;
-            color: #166534;
-            border-radius: 999px;
-            padding: 2px 8px;
-            font-weight: 700;
+            background: #eee;
+            color: #111;
+            padding: 4px 10px;
+            font-weight: 600;
             font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         .transit-line {
-            font-weight: 700;
-            color: #1e3a8a;
+            font-weight: 600;
+            color: #111;
         }
 
         .transit-step-meta {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 8px;
-            color: #374151;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            color: #555;
             font-size: 13px;
+        }
+
+        .transit-step-meta strong {
+            color: #111;
+            font-weight: 500;
         }
 
         .mode-chip {
             display: inline-block;
-            font-size: 12px;
-            font-weight: 700;
-            color: #4338ca;
-            background: #e0e7ff;
-            border-radius: 999px;
-            padding: 3px 10px;
-            margin-left: 8px;
+            font-size: 10px;
+            font-weight: 600;
+            color: #111;
+            background: #eee;
+            padding: 2px 8px;
+            margin-left: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
 
         #routeMap {
             width: 100%;
-            height: 380px;
-            border-radius: 8px;
-            border: 1px solid #e5e7eb;
-            margin-top: 8px;
-        }
-
-        .section-title {
-            margin-bottom: 8px;
-            color: #111827;
-        }
-        
-        .result-json {
-            background: white;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            padding: 15px;
-            overflow-x: auto;
-            font-family: 'Courier New', monospace;
-            font-size: 12px;
-            line-height: 1.5;
-            color: #333;
-            max-height: 400px;
-            overflow-y: auto;
+            height: 400px;
+            border: 1px solid #eaeaea;
+            margin-top: 16px;
+            margin-bottom: 32px;
         }
         
         .error-section {
-            background: #f8d7da;
-            border: 1px solid #f5c6cb;
-            color: #721c24;
-            padding: 15px;
-            border-radius: 6px;
-            margin-bottom: 20px;
+            background: #fff;
+            border: 1px solid #111;
+            color: #111;
+            padding: 24px;
+            margin-bottom: 24px;
         }
         
         .error-message {
-            margin-bottom: 15px;
-        }
-        
-        .retry-btn {
-            padding: 10px 20px;
-            background: #667eea;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
+            margin-bottom: 16px;
             font-size: 14px;
-            transition: background 0.3s;
-            margin-top: 10px;
         }
-        
-        .retry-btn:hover {
-            background: #764ba2;
+
+        @media (min-width: 768px) {
+            .container {
+                padding: 60px 40px;
+            }
         }
         
     </style>
 </head>
 <body>
+    <nav class="navbar">
+        <a href="/" class="navbar-brand">Commuter</a>
+    </nav>
     <div class="container">
         <div class="header">
             <h1>Route Plan</h1>
             <div class="header-actions">
-                <button class="home-btn" onclick="window.location.href='/'">Back to Home</button>
-                <button id="toggleAllBtn" class="toggle-all-btn" style="display:none;">Expand all</button>
-                <button class="refresh-btn" onclick="location.reload()">Refresh</button>
+                <button class="btn" onclick="window.location.href='/'">Back</button>
+                <button id="toggleAllBtn" class="btn" style="display:none;">Expand all</button>
+                <button class="btn btn-primary" onclick="location.reload()">Refresh</button>
             </div>
         </div>
         
@@ -509,7 +530,7 @@
 
         function renderMap(segments) {
             const allPoints = [];
-            const colorPalette = ['#2563eb', '#10b981', '#ef4444', '#8b5cf6'];
+            const colorPalette = ['#111111', '#555555', '#333333', '#777777'];
             segmentPointSets = [];
 
             if (!routeMap) {
@@ -693,7 +714,7 @@
                     <h3 class="section-title">Map</h3>
                     <div id="routeMap"></div>
                     <div class="segment-list">${segmentCards}</div>
-                    ${validSegmentCount === 0 ? '<p style="margin-top:12px;color:#b91c1c;">No route geometry returned by API.</p>' : ''}
+                    ${validSegmentCount === 0 ? '<p style="margin-top:12px;color:#555;">No route geometry returned by API.</p>' : ''}
                 </div>
             `;
 
@@ -752,7 +773,7 @@
                                 <strong>Route Planning Failed</strong>
                                 <p>${data.error_message || 'An error occurred while planning your route.'}</p>
                             </div>
-                            <button class="retry-btn" onclick="window.location.href='/'">Try Again</button>
+                            <button class="btn btn-primary" onclick="window.location.href='/'">Try Again</button>
                         </div>
                     `;
                 }

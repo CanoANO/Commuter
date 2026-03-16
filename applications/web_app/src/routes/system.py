@@ -141,7 +141,7 @@ def _get_route_plan_db_snapshot() -> dict[str, object]:
 
 
 def _check_rabbitmq() -> tuple[bool, str | None]:
-    amqp_url = os.getenv("AMQP_URL") or os.getenv("CLOUDAMQP_URL")
+    amqp_url = os.getenv("AMQP_URL") or os.getenv("CLOUDAMQP_URL") or os.getenv("RABBITMQ_URL")
     if not amqp_url:
         amqp_url = f"amqp://{os.getenv('RABBITMQ_USER', 'commuter')}:{os.getenv('RABBITMQ_PASSWORD', 'commuter_password')}@{os.getenv('RABBITMQ_HOST', 'rabbitmq')}:{os.getenv('RABBITMQ_PORT', '5672')}/%2F"
     try:
