@@ -51,7 +51,16 @@ class BackgroundJobManager:
         if self.publisher is None:
             raise RuntimeError("RabbitMQ publisher is not initialized")
 
-        self.publisher.publish_json(
-            queue_name=QueueNames.ROUTE_TASKS,
-            payload={"task_id": task_id},
-        )
+        try:
+            self.publisher.publish_json(
+                queue_name=QueueNames.ROUTE_TASKS,
+                payload={"task_id": task_id},
+            )
+        except Exception as exc:
+            logger.error("Failed to publish task %s. Err: %s", task_id, exc)
+            from components.database.gateways import RoutePlanGateway
+            from components.database.models import TaskStatus
+            try:
+                RoutePlanGateway().update_task_status(task_id, TaskStatus.FAILED, f"Failed to enqueue task: {exc}")
+            except Exception as db_exc:
+                logger.error("Failed to update task status to FAILED for %s: %s", task_id, db_exc)

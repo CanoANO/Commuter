@@ -141,10 +141,9 @@ def _get_route_plan_db_snapshot() -> dict[str, object]:
 
 
 def _check_rabbitmq() -> tuple[bool, str | None]:
-    amqp_url = os.getenv(
-        "AMQP_URL",
-        f"amqp://{os.getenv('RABBITMQ_USER', 'commuter')}:{os.getenv('RABBITMQ_PASSWORD', 'commuter_password')}@{os.getenv('RABBITMQ_HOST', 'rabbitmq')}:{os.getenv('RABBITMQ_PORT', '5672')}/%2F",
-    )
+    amqp_url = os.getenv("AMQP_URL") or os.getenv("CLOUDAMQP_URL")
+    if not amqp_url:
+        amqp_url = f"amqp://{os.getenv('RABBITMQ_USER', 'commuter')}:{os.getenv('RABBITMQ_PASSWORD', 'commuter_password')}@{os.getenv('RABBITMQ_HOST', 'rabbitmq')}:{os.getenv('RABBITMQ_PORT', '5672')}/%2F"
     try:
         conn = pika.BlockingConnection(pika.URLParameters(amqp_url))
         conn.close()

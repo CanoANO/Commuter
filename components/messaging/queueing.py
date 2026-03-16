@@ -23,30 +23,32 @@ class _ConnectionSettings:
 
 
 def _get_settings() -> _ConnectionSettings:
+    amqp_url = os.getenv("AMQP_URL") or os.getenv("CLOUDAMQP_URL")
+    if not amqp_url:
+        amqp_url = f"amqp://{os.getenv('RABBITMQ_USER', 'commuter')}:{os.getenv('RABBITMQ_PASSWORD', 'commuter_password')}@{os.getenv('RABBITMQ_HOST', 'rabbitmq')}:{os.getenv('RABBITMQ_PORT', '5672')}/%2F"
+    
     return _ConnectionSettings(
-        amqp_url=os.getenv(
-            "AMQP_URL",
-            f"amqp://{os.getenv('RABBITMQ_USER', 'commuter')}:{os.getenv('RABBITMQ_PASSWORD', 'commuter_password')}@{os.getenv('RABBITMQ_HOST', 'rabbitmq')}:{os.getenv('RABBITMQ_PORT', '5672')}/%2F",
-        ),
+        amqp_url=amqp_url,
         connect_retries=int(os.getenv("AMQP_CONNECT_RETRIES", "30")),
         retry_interval_seconds=int(os.getenv("AMQP_RETRY_INTERVAL_SECONDS", "2")),
     )
 
 
-def _create_connection() -> pika.BlockingConnection:
+def _create_connection(is_publisher: bool = False) -> pika.BlockingConnection:
     settings = _get_settings()
     params = pika.URLParameters(settings.amqp_url)
 
-    for attempt in range(1, settings.connect_retries + 1):
+    retries = 2 if is_publisher else settings.connect_retries
+    for attempt in range(1, retries + 1):
         try:
             return pika.BlockingConnection(params)
         except Exception as exc:
-            if attempt >= settings.connect_retries:
+            if attempt >= retries:
                 raise
             logger.warning(
                 "RabbitMQ connect failed attempt=%s/%s error=%s",
                 attempt,
-                settings.connect_retries,
+                retries,
                 exc,
             )
             time.sleep(settings.retry_interval_seconds)
@@ -56,7 +58,7 @@ def _create_connection() -> pika.BlockingConnection:
 
 class RabbitMQPublisher:
     def publish_json(self, queue_name: str, payload: dict) -> None:
-        connection = _create_connection()
+        connection = _create_connection(is_publisher=True)
         try:
             channel = connection.channel()
             channel.queue_declare(queue=queue_name, durable=True)
