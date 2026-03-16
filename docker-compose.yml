@@ -73,6 +73,7 @@ services:
       - ${ENV_FILE:-.env}
     environment:
       FLASK_ENV: ${FLASK_ENV:-production}
+      JOB_BACKEND: ${JOB_BACKEND:-local}
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: ${REDIS_URL}
       AMQP_URL: ${AMQP_URL:-amqp://commuter:commuter_password@rabbitmq:5672/%2F}

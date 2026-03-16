@@ -1,2 +1,2 @@
-web: PYTHONPATH=. WEB_GUNICORN_BIND=0.0.0.0:$PORT bash scripts/start_all.sh
+web: PYTHONPATH=. JOB_BACKEND=rabbitmq EMBEDDED_CONSUMERS=true WEB_GUNICORN_WORKERS=1 WEB_GUNICORN_BIND=0.0.0.0:$PORT bash scripts/start_all.sh
 release: PYTHONPATH=. python -c "from components.database.session import _run_alembic_migrations; _run_alembic_migrations()"
