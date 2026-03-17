@@ -18,7 +18,6 @@ class GoogleMapsCollector:
         mapping = {
             "drive": "DRIVE",
             "transit": "TRANSIT",
-            "mixed": "DRIVE",
         }
         return mapping.get((mode or "drive").lower(), "DRIVE")
 
@@ -55,153 +54,126 @@ class GoogleMapsCollector:
             return
 
         logger.info(
-            "Processing task task_id=%s mode=%s drive_part=%s start='%s' transfer='%s' destination='%s'",
+            "Processing task task_id=%s locations=%s segment_modes=%s",
             task_id,
-            task.get("mode"),
-            task.get("drive_part"),
-            task.get("start_text"),
-            task.get("transfer_text"),
-            task.get("destination_text"),
+            task.get("location_texts"),
+            task.get("segment_modes"),
         )
 
         self.gateway.update_task_status(task_id, TaskStatus.PROCESSING)
 
         try:
-            start_text = task.get("start_text") or ""
-            destination_text = task.get("destination_text") or ""
-            start_loc = self._resolve_location(start_text)
-            dest_loc = self._resolve_location(destination_text)
-            transfer_text = task.get("transfer_text")
-            transfer_loc = self._resolve_location(transfer_text) if transfer_text else None
-            mode = (task.get("mode") or "drive").lower()
-            drive_part = (task.get("drive_part") or "").lower() or None
+            location_texts = [
+                str(item).strip()
+                for item in (task.get("location_texts") or [])
+                if str(item).strip()
+            ]
+            segment_modes = [
+                str(item).strip().lower()
+                for item in (task.get("segment_modes") or [])
+            ]
             arrive_time = task.get("arrive_time")
             query_time = task.get("query_time")
 
-            if not start_loc or not dest_loc:
-                missing_parts: list[str] = []
-                if not start_loc:
-                    missing_parts.append("start")
-                if not dest_loc:
-                    missing_parts.append("destination")
-                failure_message = f"Failed to geocode {', '.join(missing_parts)} address"
+            if len(location_texts) < 2:
+                self.gateway.update_task_status(task_id, TaskStatus.FAILED, "Task requires at least two locations")
+                return
+
+            if len(segment_modes) != len(location_texts) - 1:
+                self.gateway.update_task_status(task_id, TaskStatus.FAILED, "Segment modes length mismatch")
+                return
+
+            if any(mode not in {"drive", "transit"} for mode in segment_modes):
+                self.gateway.update_task_status(task_id, TaskStatus.FAILED, "Invalid segment mode")
+                return
+
+            resolved_points: list[dict] = []
+            missing_indices: list[int] = []
+            for index, location_text in enumerate(location_texts):
+                point = self._resolve_location(location_text)
+                if not point:
+                    missing_indices.append(index)
+                resolved_points.append(point)
+
+            if missing_indices:
+                missing_text = ", ".join(str(index + 1) for index in missing_indices)
+                failure_message = f"Failed to geocode location index: {missing_text}"
                 logger.warning(
-                    "Task geocode failed task_id=%s missing=%s start='%s' destination='%s'",
+                    "Task geocode failed task_id=%s missing_indices=%s",
                     task_id,
-                    ",".join(missing_parts),
-                    start_text,
-                    destination_text,
+                    missing_text,
                 )
                 self.gateway.update_task_status(task_id, TaskStatus.FAILED, failure_message)
                 return
 
-            if mode == "mixed" and not transfer_loc:
-                logger.warning("Task mixed mode transfer geocode failed task_id=%s transfer='%s'", task_id, transfer_text)
-                self.gateway.update_task_status(task_id, TaskStatus.FAILED, "Mixed mode requires a valid transfer address")
-                return
+            segments: list[dict] = []
+            segment_count = len(segment_modes)
 
-            if mode == "mixed" and drive_part not in {"first", "second"}:
-                logger.warning("Task mixed mode invalid drive_part task_id=%s drive_part=%s", task_id, drive_part)
-                self.gateway.update_task_status(task_id, TaskStatus.FAILED, "Mixed mode requires drive_part to be first or second")
-                return
-
-            if mode == "mixed":
-                if drive_part == "first":
-                    first_leg_mode = "DRIVE"
-                    second_leg_mode = "TRANSIT"
-                else:
-                    first_leg_mode = "TRANSIT"
-                    second_leg_mode = "DRIVE"
-
-                if drive_part == "first":
-                    first_leg = self.maps.compute_route(
-                        start_loc,
-                        transfer_loc,
-                        mode="DRIVE",
+            if arrive_time:
+                current_arrival = arrive_time
+                reverse_segments: list[dict] = []
+                for index in range(segment_count - 1, -1, -1):
+                    origin = resolved_points[index]
+                    destination = resolved_points[index + 1]
+                    mode = segment_modes[index]
+                    travel_mode = self._map_travel_mode(mode)
+                    route_payload = self.maps.compute_route(
+                        origin,
+                        destination,
+                        mode=travel_mode,
+                        arrival_time=current_arrival if travel_mode == "TRANSIT" else None,
+                        departure_time=None,
                     )
-                    first_leg_seconds = self._route_duration_seconds(first_leg)
-                    earliest_transit_departure = (
-                        query_time + timedelta(seconds=first_leg_seconds)
-                        if query_time and first_leg_seconds > 0
-                        else query_time
-                    )
-                    second_leg = self.maps.compute_route(
-                        transfer_loc,
-                        dest_loc,
-                        mode="TRANSIT",
-                        arrival_time=arrive_time,
-                        departure_time=None if arrive_time else earliest_transit_departure,
-                    )
-                else:
-                    second_leg = self.maps.compute_route(
-                        transfer_loc,
-                        dest_loc,
-                        mode="DRIVE",
-                    )
-                    second_leg_seconds = self._route_duration_seconds(second_leg)
-                    target_transit_arrival = (
-                        arrive_time - timedelta(seconds=second_leg_seconds)
-                        if arrive_time and second_leg_seconds > 0
-                        else arrive_time
-                    )
-                    first_leg = self.maps.compute_route(
-                        start_loc,
-                        transfer_loc,
-                        mode="TRANSIT",
-                        arrival_time=target_transit_arrival,
-                        departure_time=None if target_transit_arrival else query_time,
-                    )
-
-                route_result = {
-                    "mode": "mixed",
-                    "drive_part": drive_part,
-                    "segments": [
+                    duration_seconds = self._route_duration_seconds(route_payload)
+                    if current_arrival and duration_seconds > 0:
+                        current_arrival = current_arrival - timedelta(seconds=duration_seconds)
+                    reverse_segments.append(
                         {
-                            "from": "start",
-                            "to": "transfer",
-                            "travel_mode": first_leg_mode,
-                            "route": first_leg,
-                        },
-                        {
-                            "from": "transfer",
-                            "to": "destination",
-                            "travel_mode": second_leg_mode,
-                            "route": second_leg,
-                        },
-                    ],
-                }
-            else:
-                travel_mode = self._map_travel_mode(mode)
-                transit_departure_time = query_time if travel_mode == "TRANSIT" and not arrive_time else None
-                single_route = self.maps.compute_route(
-                    start_loc,
-                    dest_loc,
-                    mode=travel_mode,
-                    arrival_time=arrive_time if travel_mode == "TRANSIT" else None,
-                    departure_time=transit_departure_time,
-                )
-                route_result = {
-                    "mode": mode,
-                    "travel_mode": travel_mode,
-                    "segments": [
-                        {
-                            "from": "start",
-                            "to": "destination",
+                            "from": location_texts[index],
+                            "to": location_texts[index + 1],
                             "travel_mode": travel_mode,
-                            "route": single_route,
+                            "route": route_payload,
                         }
-                    ],
-                }
+                    )
+                segments = list(reversed(reverse_segments))
+            else:
+                current_departure = query_time
+                for index in range(segment_count):
+                    origin = resolved_points[index]
+                    destination = resolved_points[index + 1]
+                    mode = segment_modes[index]
+                    travel_mode = self._map_travel_mode(mode)
+                    route_payload = self.maps.compute_route(
+                        origin,
+                        destination,
+                        mode=travel_mode,
+                        arrival_time=None,
+                        departure_time=current_departure if travel_mode == "TRANSIT" else None,
+                    )
+                    duration_seconds = self._route_duration_seconds(route_payload)
+                    if current_departure and duration_seconds > 0:
+                        current_departure = current_departure + timedelta(seconds=duration_seconds)
+                    segments.append(
+                        {
+                            "from": location_texts[index],
+                            "to": location_texts[index + 1],
+                            "travel_mode": travel_mode,
+                            "route": route_payload,
+                        }
+                    )
+
+            unique_modes = sorted(set(segment_modes))
+            aggregated_mode = unique_modes[0] if len(unique_modes) == 1 else "mixed"
+            route_result = {
+                "mode": aggregated_mode,
+                "requested_segment_modes": segment_modes,
+                "segments": segments,
+            }
 
             self.gateway.save_route_result(
                 task_id=task_id,
-                start_lat=start_loc["lat"],
-                start_lng=start_loc["lng"],
-                destination_lat=dest_loc["lat"],
-                destination_lng=dest_loc["lng"],
-                transfer_lat=transfer_loc["lat"] if transfer_loc else None,
-                transfer_lng=transfer_loc["lng"] if transfer_loc else None,
                 result_json=json.dumps(route_result),
+                location_points=resolved_points,
             )
             logger.info("Task processed successfully task_id=%s", task_id)
         except Exception as exc:

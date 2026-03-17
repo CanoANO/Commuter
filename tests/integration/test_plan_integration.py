@@ -1,18 +1,17 @@
 def test_create_route_plan_triggers_background_job(client, mocked_plan_dependencies):
-    mocked_plan_dependencies["create_route_plan"].return_value = "task-123"
+    mocked_plan_dependencies["create_route_plan_from_locations"].return_value = "task-123"
 
     response = client.post(
         "/route-plans",
         json={
-            "start_address": "A",
-            "destination_address": "B",
-            "mode": "drive",
+            "locations": ["A", "B", "C"],
+            "modes": ["drive", "transit"],
         },
     )
 
     assert response.status_code == 201
     assert response.get_json()["task_id"] == "task-123"
-    mocked_plan_dependencies["create_route_plan"].assert_called_once()
+    mocked_plan_dependencies["create_route_plan_from_locations"].assert_called_once()
     mocked_plan_dependencies["trigger_route_processing"].assert_called_once_with("task-123")
 
 

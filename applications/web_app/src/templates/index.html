@@ -326,6 +326,161 @@
             box-shadow: none;
         }
 
+        .stops-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .stop-item {
+            border: 1px solid #ddd;
+            background: #fff;
+            padding: 12px;
+        }
+
+        .stop-item.dragging {
+            opacity: 0.6;
+            border-style: dashed;
+        }
+
+        .stop-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+
+        .stop-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .location-input-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .location-input-wrap {
+            position: relative;
+            flex: 1;
+        }
+
+        .location-input-row input[type="text"] {
+            width: 100%;
+        }
+
+        .add-location-btn {
+            width: 40px;
+            height: 40px;
+            border: 1px solid #ddd;
+            background: #fff;
+            color: #111;
+            font-size: 20px;
+            line-height: 1;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        .add-location-btn:hover {
+            border-color: #111;
+        }
+
+        .stop-btn {
+            border: 1px solid #ddd;
+            background: #fff;
+            color: #111;
+            padding: 4px 10px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .drag-handle {
+            border: 1px solid #ddd;
+            background: #fff;
+            color: #111;
+            width: 32px;
+            height: 32px;
+            padding: 0;
+            cursor: grab;
+            font-family: inherit;
+            line-height: 1;
+            position: relative;
+        }
+
+        .drag-handle::before {
+            content: '';
+            position: absolute;
+            left: 9px;
+            top: 9px;
+            width: 12px;
+            height: 2px;
+            background: #666;
+            box-shadow: 0 5px 0 #666, 0 10px 0 #666;
+        }
+
+        .drag-handle:active {
+            cursor: grabbing;
+        }
+
+        .segments-list {
+            margin-top: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .segment-row {
+            border: 1px solid #eaeaea;
+            background: #fafafa;
+            padding: 10px 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .segment-title {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+
+        .segment-toggle {
+            display: inline-flex;
+            border: 1px solid #ddd;
+            background: #fff;
+        }
+
+        .segment-toggle-btn {
+            min-width: 72px;
+            padding: 8px 12px;
+            border: none;
+            background: #fff;
+            color: #666;
+            font-size: 12px;
+            font-weight: 500;
+            letter-spacing: 0.3px;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.2s ease;
+        }
+
+        .segment-toggle-btn + .segment-toggle-btn {
+            border-left: 1px solid #ddd;
+        }
+
+        .segment-toggle-btn.active {
+            background: #111;
+            color: #fff;
+        }
+
         @media (min-width: 768px) {
             .container {
                 padding: 60px 40px;
@@ -344,11 +499,11 @@
         <div class="card usage-card">
             <div class="usage-title">How to use</div>
             <ol class="usage-list">
-                <li>Enter <strong>Start Address</strong> and <strong>Destination Address</strong>.</li>
-                <li>Select <strong>Drive</strong>, <strong>Transit</strong>, or <strong>Mixed</strong>, then choose the drive part.</li>
-                <li>Click <strong>Submit</strong> to create a task and open the result page.</li>
+                <li>Add at least two destinations in order.</li>
+                <li>Choose <strong>Drive</strong> or <strong>Transit</strong> for every segment.</li>
+                <li>Drag cards to reorder and submit to start planning.</li>
             </ol>
-            <div class="usage-tip">Note: <strong>Transfer Address</strong> is required in <strong>Mixed</strong> mode.</div>
+            <div class="usage-tip">Tip: input addresses manually and press Enter (or +) to add each location.</div>
         </div>
 
         <div id="globalMessage" class="global-message" style="display:none;"></div>
@@ -366,38 +521,16 @@
         
         <form id="routeForm" class="card">
             <div class="form-group">
-                <label for="startAddress">Start Address *</label>
-                <input type="text" id="startAddress" name="start_address" required>
-                <div id="startAddressError" class="field-error"></div>
-            </div>
-            
-            <div class="form-group">
-                <label for="transferAddress">Transfer Address</label>
-                <input type="text" id="transferAddress" name="transfer_address">
-                <div id="transferAddressError" class="field-error"></div>
-            </div>
-            
-            <div class="form-group">
-                <label for="destinationAddress">Destination Address *</label>
-                <input type="text" id="destinationAddress" name="destination_address" required>
-                <div id="destinationAddressError" class="field-error"></div>
-            </div>
-
-            <div class="form-group">
-                <label>Mode *</label>
-                <div class="radio-group">
-                    <label><input type="radio" name="mode" value="drive" checked> Drive</label>
-                    <label><input type="radio" name="mode" value="transit"> Transit</label>
-                    <label><input type="radio" name="mode" value="mixed"> Mixed</label>
+                <label>Locations *</label>
+                <div class="location-input-row">
+                    <div class="location-input-wrap">
+                        <input type="text" id="newLocationInput" placeholder="Input address and press Enter" autocomplete="off">
+                    </div>
+                    <button type="button" id="addLocationBtn" class="add-location-btn" aria-label="Add location" title="Add location">+</button>
                 </div>
-            </div>
-            
-            <div class="form-group">
-                <label>Drive Part *</label>
-                <div class="radio-group">
-                    <label><input type="radio" name="drive_part" value="first" checked> First</label>
-                    <label><input type="radio" name="drive_part" value="second"> Second</label>
-                </div>
+                <div id="stopsList" class="stops-list"></div>
+                <div id="modesError" class="field-error"></div>
+                <div id="locationsError" class="field-error"></div>
             </div>
             
             <div class="form-group">
@@ -415,7 +548,12 @@
         const HISTORY_KEY = 'commuter_route_history_v1';
         const HISTORY_MAX_ITEMS = 8;
         const form = document.getElementById('routeForm');
-        const transferInput = document.getElementById('transferAddress');
+        const newLocationInput = document.getElementById('newLocationInput');
+        const addLocationBtn = document.getElementById('addLocationBtn');
+        const stopsList = document.getElementById('stopsList');
+        let dragSourceIndex = null;
+        let dragHandleIndex = null;
+        let isComposingInput = false;
         const historySection = document.querySelector('.history-section');
         const historyList = document.getElementById('historyList');
         const toggleHistoryBtn = document.getElementById('toggleHistoryBtn');
@@ -423,10 +561,14 @@
         const globalMessage = document.getElementById('globalMessage');
         const submitBtn = form.querySelector('.submit-btn');
         const fieldErrors = {
-            start_address: document.getElementById('startAddressError'),
-            transfer_address: document.getElementById('transferAddressError'),
-            destination_address: document.getElementById('destinationAddressError'),
+            locations: document.getElementById('locationsError'),
+            modes: document.getElementById('modesError'),
             arrive_time: document.getElementById('arriveTimeError')
+        };
+
+        const formState = {
+            stops: [],
+            modes: []
         };
 
         function showGlobalMessage(text, type = 'error') {
@@ -507,11 +649,11 @@
             historyList.innerHTML = items.map((item, index) => `
                 <div class="history-item">
                     <div class="history-main">
-                        <div class="history-row" title="${escapeHtml(item.start_address)}">${escapeHtml(item.start_address)}</div>
+                        <div class="history-row" title="${escapeHtml((item.locations || [])[0] || '')}">${escapeHtml((item.locations || [])[0] || '')}</div>
                         <div class="history-mode-row">
-                            <span class="history-mode-chip">${escapeHtml(item.mode || 'drive')}</span>
+                            <span class="history-mode-chip">${escapeHtml((item.modes || []).join(' → ') || 'drive')}</span>
                         </div>
-                        <div class="history-row" title="${escapeHtml(item.destination_address)}">${escapeHtml(item.destination_address)}</div>
+                        <div class="history-row" title="${escapeHtml((item.locations || []).at(-1) || '')}">${escapeHtml((item.locations || []).at(-1) || '')}</div>
                     </div>
                     <div class="history-meta">
                         <span class="history-task">Planned at ${escapeHtml(formatHistoryTime(item.created_at))}</span>
@@ -524,9 +666,14 @@
             `).join('');
         }
 
-        function setRadioValue(name, value) {
-            const option = document.querySelector(`input[name="${name}"][value="${value}"]`);
-            if (option) option.checked = true;
+        function ensureModesLength() {
+            const need = Math.max(formState.stops.length - 1, 0);
+            while (formState.modes.length < need) {
+                formState.modes.push('drive');
+            }
+            while (formState.modes.length > need) {
+                formState.modes.pop();
+            }
         }
 
         function reuseHistoryItem(index) {
@@ -534,22 +681,140 @@
             const item = items[index];
             if (!item) return;
 
-            document.getElementById('startAddress').value = item.start_address || '';
-            document.getElementById('destinationAddress').value = item.destination_address || '';
-            document.getElementById('transferAddress').value = item.transfer_address || '';
-            setRadioValue('mode', item.mode || 'drive');
-            setRadioValue('drive_part', item.drive_part || 'first');
-            syncTransferRequirement();
+            const nextStops = Array.isArray(item.locations) ? item.locations : [];
+            if (nextStops.length >= 2) {
+                formState.stops = nextStops.map((address) => ({ id: crypto.randomUUID(), address: address || '' }));
+                formState.modes = Array.isArray(item.modes)
+                    ? item.modes.map((mode) => (mode === 'transit' ? 'transit' : 'drive'))
+                    : [];
+                ensureModesLength();
+                renderDynamicForm();
+            }
         }
 
-        function syncTransferRequirement() {
-            const selectedMode = document.querySelector('input[name="mode"]:checked')?.value;
-            transferInput.required = selectedMode === 'mixed';
+        function modeLabel(index) {
+            return `Segment ${index + 1}`;
         }
 
-        document.querySelectorAll('input[name="mode"]').forEach((el) => {
-            el.addEventListener('change', syncTransferRequirement);
-        });
+        function addLocation(addressValue) {
+            const address = (addressValue || '').trim();
+            if (!address) {
+                return;
+            }
+            formState.stops.push({ id: crypto.randomUUID(), address });
+            ensureModesLength();
+            newLocationInput.value = '';
+            setFieldError('locations', '');
+            renderDynamicForm();
+        }
+
+        function commitAddressInput() {
+            const rawInput = (newLocationInput.value || '').trim();
+            if (!rawInput) {
+                return;
+            }
+            addLocation(rawInput);
+        }
+
+        function renderStops() {
+            ensureModesLength();
+            let html = '';
+            formState.stops.forEach((stop, index) => {
+                html += `
+                    <div class="stop-item" draggable="true" data-stop-index="${index}">
+                        <div class="stop-head">
+                            <span>Location ${index + 1}</span>
+                            <div class="stop-actions">
+                                <button type="button" class="drag-handle" data-drag-handle="${index}" aria-label="Drag location ${index + 1}" title="Drag"></button>
+                                <button type="button" class="stop-btn" data-remove-stop="${index}">Remove</button>
+                            </div>
+                        </div>
+                        <div class="history-row" title="${escapeHtml(stop.address)}">${escapeHtml(stop.address)}</div>
+                    </div>
+                `;
+
+                if (index < formState.stops.length - 1) {
+                    const mode = formState.modes[index] === 'transit' ? 'transit' : 'drive';
+                    html += `
+                        <div class="segment-row" data-segment-row="${index}">
+                            <div class="segment-title">${modeLabel(index)}: ${index + 1} → ${index + 2}</div>
+                            <div class="segment-toggle" role="group" aria-label="${modeLabel(index)} mode toggle">
+                                <button type="button" class="segment-toggle-btn ${mode === 'drive' ? 'active' : ''}" data-mode-index="${index}" data-mode-value="drive">Drive</button>
+                                <button type="button" class="segment-toggle-btn ${mode === 'transit' ? 'active' : ''}" data-mode-index="${index}" data-mode-value="transit">Transit</button>
+                            </div>
+                        </div>
+                    `;
+                }
+            });
+
+            stopsList.innerHTML = html;
+            stopsList.querySelectorAll('[data-remove-stop]').forEach((button) => {
+                button.addEventListener('click', () => {
+                    const idx = Number(button.getAttribute('data-remove-stop'));
+                    if (formState.stops.length === 0) return;
+                    formState.stops.splice(idx, 1);
+                    ensureModesLength();
+                    renderDynamicForm();
+                });
+            });
+
+            stopsList.querySelectorAll('[data-drag-handle]').forEach((button) => {
+                const setHandle = () => {
+                    dragHandleIndex = Number(button.getAttribute('data-drag-handle'));
+                };
+                button.addEventListener('mousedown', setHandle);
+                button.addEventListener('touchstart', setHandle, { passive: true });
+                button.addEventListener('keydown', (event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                        setHandle();
+                    }
+                });
+            });
+
+            stopsList.querySelectorAll('[data-mode-index][data-mode-value]').forEach((button) => {
+                button.addEventListener('click', (event) => {
+                    const idx = Number(event.currentTarget.getAttribute('data-mode-index'));
+                    const value = event.currentTarget.getAttribute('data-mode-value') === 'transit' ? 'transit' : 'drive';
+                    formState.modes[idx] = value;
+                    renderStops();
+                });
+            });
+
+            stopsList.querySelectorAll('[data-stop-index]').forEach((item) => {
+                item.addEventListener('dragstart', (event) => {
+                    const currentIndex = Number(item.getAttribute('data-stop-index'));
+                    if (dragHandleIndex !== currentIndex) {
+                        event.preventDefault();
+                        return;
+                    }
+                    dragSourceIndex = currentIndex;
+                    item.classList.add('dragging');
+                });
+                item.addEventListener('dragend', () => {
+                    item.classList.remove('dragging');
+                    dragSourceIndex = null;
+                    dragHandleIndex = null;
+                });
+                item.addEventListener('dragover', (event) => {
+                    event.preventDefault();
+                });
+                item.addEventListener('drop', (event) => {
+                    event.preventDefault();
+                    const targetIndex = Number(item.getAttribute('data-stop-index'));
+                    if (dragSourceIndex === null || dragSourceIndex === targetIndex) {
+                        return;
+                    }
+                    const [moved] = formState.stops.splice(dragSourceIndex, 1);
+                    formState.stops.splice(targetIndex, 0, moved);
+                    ensureModesLength();
+                    renderDynamicForm();
+                });
+            });
+        }
+
+        function renderDynamicForm() {
+            renderStops();
+        }
 
         historyList.addEventListener('click', (event) => {
             const openIndex = event.target.getAttribute('data-history-open');
@@ -584,9 +849,35 @@
             setHistoryCollapsed(shouldCollapse);
         });
 
-        syncTransferRequirement();
         setHistoryCollapsed(false);
         renderHistory();
+        renderDynamicForm();
+
+        newLocationInput.addEventListener('compositionstart', () => {
+            isComposingInput = true;
+        });
+
+        newLocationInput.addEventListener('compositionend', () => {
+            isComposingInput = false;
+        });
+
+        newLocationInput.addEventListener('keydown', (event) => {
+            if (event.isComposing || isComposingInput) {
+                return;
+            }
+
+            if (event.key !== 'Enter') {
+                return;
+            }
+
+            event.preventDefault();
+            commitAddressInput();
+        });
+
+        addLocationBtn.addEventListener('click', () => {
+            commitAddressInput();
+            newLocationInput.focus();
+        });
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -595,10 +886,8 @@
             setSubmitting(true);
             
             const formData = new FormData(form);
-            const mode = formData.get('mode');
-            const startAddress = (formData.get('start_address') || '').toString().trim();
-            const transferAddress = (formData.get('transfer_address') || '').toString().trim();
-            const destinationAddress = (formData.get('destination_address') || '').toString().trim();
+            const locations = formState.stops.map((item) => (item.address || '').trim()).filter(Boolean);
+            const modes = formState.modes.map((item) => (item === 'transit' ? 'transit' : 'drive'));
             const arriveTimeRaw = (formData.get('arrive_time') || '').toString().trim();
             let arriveTime = null;
 
@@ -614,32 +903,24 @@
                 }
             }
 
-            if (!startAddress) {
-                setFieldError('start_address', 'Start address is required.');
-            }
-            if (!destinationAddress) {
-                setFieldError('destination_address', 'Destination address is required.');
-            }
-            if (!startAddress || !destinationAddress) {
+            if (locations.length < 2) {
+                setFieldError('locations', 'Please provide at least 2 locations.');
                 showGlobalMessage('Please fill in required fields.');
                 setSubmitting(false);
                 return;
             }
 
-            if (mode === 'mixed' && !transferAddress) {
-                setFieldError('transfer_address', 'Transfer address is required in Mixed mode.');
+            if (modes.length !== locations.length - 1) {
+                setFieldError('modes', 'Segment modes count must equal locations count - 1.');
                 showGlobalMessage('Please fill in required fields.');
                 setSubmitting(false);
                 return;
             }
 
             const data = {
-                start_address: startAddress,
-                transfer_address: transferAddress || null,
-                destination_address: destinationAddress,
-                drive_part: formData.get('drive_part'),
+                locations,
+                modes,
                 arrive_time: arriveTime,
-                mode: mode || 'drive'
             };
             
             try {
@@ -653,11 +934,8 @@
                     const result = await response.json();
                     saveHistory({
                         task_id: result.task_id,
-                        start_address: startAddress,
-                        destination_address: destinationAddress,
-                        transfer_address: transferAddress || '',
-                        mode: mode || 'drive',
-                        drive_part: formData.get('drive_part') || 'first',
+                        locations,
+                        modes,
                         created_at: new Date().toISOString()
                     });
                     window.location.href = `/route-plans/${result.task_id}`;
@@ -681,6 +959,7 @@
                 setSubmitting(false);
             }
         });
+
     </script>
 </body>
 </html>

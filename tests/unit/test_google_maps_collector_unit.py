@@ -28,11 +28,8 @@ def test_process_task_marks_failed_when_geocode_missing(monkeypatch, collector_m
 
     collector.gateway.get_task_inputs.return_value = {
         "task_id": "task-1",
-        "start_text": "A",
-        "destination_text": "B",
-        "transfer_text": None,
-        "mode": "drive",
-        "drive_part": None,
+        "location_texts": ["A", "B"],
+        "segment_modes": ["drive"],
         "arrive_time": None,
     }
 
@@ -42,7 +39,7 @@ def test_process_task_marks_failed_when_geocode_missing(monkeypatch, collector_m
 
     collector.gateway.update_task_status.assert_any_call("task-1", collector_module.TaskStatus.PROCESSING)
     collector.gateway.update_task_status.assert_any_call(
-        "task-1", collector_module.TaskStatus.FAILED, "Failed to geocode start address"
+        "task-1", collector_module.TaskStatus.FAILED, "Failed to geocode location index: 1"
     )
     collector.gateway.save_route_result.assert_not_called()
 
@@ -55,11 +52,8 @@ def test_process_task_saves_result_for_drive_mode(collector_module):
 
     collector.gateway.get_task_inputs.return_value = {
         "task_id": "task-2",
-        "start_text": "A",
-        "destination_text": "B",
-        "transfer_text": None,
-        "mode": "drive",
-        "drive_part": None,
+        "location_texts": ["A", "B"],
+        "segment_modes": ["drive"],
         "arrive_time": None,
     }
 
@@ -85,11 +79,8 @@ def test_process_task_transit_uses_query_time_as_departure_time(collector_module
 
     collector.gateway.get_task_inputs.return_value = {
         "task_id": "task-3",
-        "start_text": "A",
-        "destination_text": "B",
-        "transfer_text": None,
-        "mode": "transit",
-        "drive_part": None,
+        "location_texts": ["A", "B"],
+        "segment_modes": ["transit"],
         "arrive_time": None,
         "query_time": query_time,
     }
@@ -116,11 +107,8 @@ def test_process_task_uses_cached_coordinates_before_geocode(collector_module):
 
     collector.gateway.get_task_inputs.return_value = {
         "task_id": "task-cache",
-        "start_text": "A",
-        "destination_text": "B",
-        "transfer_text": None,
-        "mode": "drive",
-        "drive_part": None,
+        "location_texts": ["A", "B"],
+        "segment_modes": ["drive"],
         "arrive_time": None,
     }
     collector.gateway.get_cached_coordinates.side_effect = [
@@ -143,11 +131,8 @@ def test_process_task_falls_back_to_geocode_when_cache_miss(collector_module):
 
     collector.gateway.get_task_inputs.return_value = {
         "task_id": "task-cache-miss",
-        "start_text": "A",
-        "destination_text": "B",
-        "transfer_text": None,
-        "mode": "drive",
-        "drive_part": None,
+        "location_texts": ["A", "B"],
+        "segment_modes": ["drive"],
         "arrive_time": None,
     }
     collector.gateway.get_cached_coordinates.return_value = None

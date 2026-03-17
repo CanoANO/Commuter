@@ -530,7 +530,7 @@
 
         function renderMap(segments) {
             const allPoints = [];
-            const colorPalette = ['#111111', '#555555', '#333333', '#777777'];
+            const colorPalette = ['#ff4d4f', '#1890ff', '#52c41a', '#faad14', '#722ed1', '#13c2c2'];
             segmentPointSets = [];
 
             if (!routeMap) {
@@ -617,6 +617,15 @@
             const analysis = data?.analysis || {};
             const summary = analysis?.summary || {};
             const segmentDetails = Array.isArray(analysis?.segments) ? analysis.segments : [];
+            const modeCounts = segments.reduce((acc, item) => {
+                const travelMode = String(item?.travel_mode || '').toUpperCase();
+                if (!travelMode) return acc;
+                acc[travelMode] = (acc[travelMode] || 0) + 1;
+                return acc;
+            }, {});
+            const modeSummaryText = Object.entries(modeCounts)
+                .map(([mode, count]) => `${mode}: ${count}`)
+                .join(' | ') || '-';
             const validSegmentCount = segments.filter((segment) => {
                 const route = segment?.route?.routes?.[0] || {};
                 return Object.keys(route).length > 0;
@@ -684,6 +693,10 @@
                         <div class="summary-item">
                             <div class="summary-label">Mode</div>
                             <div class="summary-value">${summary.mode || '-'}</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-label">Segment Modes</div>
+                            <div class="summary-value">${modeSummaryText}</div>
                         </div>
                         <div class="summary-item">
                             <div class="summary-label">Segments</div>

@@ -37,7 +37,7 @@ def client(app):
 @pytest.fixture
 def mocked_plan_dependencies(monkeypatch, plan_module):
     dependencies = {
-        "create_route_plan": MagicMock(),
+        "create_route_plan_from_locations": MagicMock(),
         "get_route_plan": MagicMock(),
         "trigger_route_processing": MagicMock(),
         "cache_get_analysis": MagicMock(),
@@ -46,7 +46,11 @@ def mocked_plan_dependencies(monkeypatch, plan_module):
         "metrics_increment": MagicMock(),
     }
 
-    monkeypatch.setattr(plan_module.route_plan_gateway, "create_route_plan", dependencies["create_route_plan"])
+    monkeypatch.setattr(
+        plan_module.route_plan_gateway,
+        "create_route_plan_from_locations",
+        dependencies["create_route_plan_from_locations"],
+    )
     monkeypatch.setattr(plan_module.route_plan_gateway, "get_route_plan", dependencies["get_route_plan"])
     monkeypatch.setattr(plan_module.job_manager, "trigger_route_processing", dependencies["trigger_route_processing"])
     monkeypatch.setattr(plan_module.analysis_cache, "get_analysis", dependencies["cache_get_analysis"])

@@ -17,41 +17,73 @@ def create_route_plan():
     data = request.get_json(silent=True) or {}
     metrics_store.increment('route_plans.requests_total')
 
-    start_text = (data.get('start_address') or '').strip()
-    destination_text = (data.get('destination_address') or '').strip()
-    transfer_text = (data.get('transfer_address') or '').strip() or None
-    mode = (data.get('mode') or 'drive').strip()
-    drive_part = data.get('drive_part')
+    raw_locations = data.get('locations')
+    raw_modes = data.get('modes')
 
-    if not start_text or not destination_text:
+    if isinstance(raw_locations, list) and isinstance(raw_modes, list):
+        location_texts = [str(item).strip() for item in raw_locations if str(item).strip()]
+        segment_modes = [str(item).strip().lower() for item in raw_modes]
+    else:
+        start_text = (data.get('start_address') or '').strip()
+        destination_text = (data.get('destination_address') or '').strip()
+        transfer_text = (data.get('transfer_address') or '').strip() or None
+        mode = (data.get('mode') or 'drive').strip().lower()
+        drive_part = data.get('drive_part')
+
+        if not start_text or not destination_text:
+            metrics_store.increment('route_plans.validation_failed_total')
+            return jsonify({'error': 'locations must include at least start and destination'}), 400
+
+        if mode not in {'drive', 'transit', 'mixed'}:
+            metrics_store.increment('route_plans.validation_failed_total')
+            return jsonify({'error': 'invalid mode'}), 400
+
+        if drive_part not in {'first', 'second', None}:
+            metrics_store.increment('route_plans.validation_failed_total')
+            return jsonify({'error': 'invalid drive_part'}), 400
+
+        location_texts = [start_text]
+        if transfer_text:
+            location_texts.append(transfer_text)
+        location_texts.append(destination_text)
+
+        if mode == 'mixed' and not transfer_text:
+            metrics_store.increment('route_plans.validation_failed_total')
+            return jsonify({'error': 'transfer_address is required for mixed mode'}), 400
+
+        if mode == 'mixed':
+            if drive_part == 'second':
+                segment_modes = ['transit', 'drive']
+            else:
+                segment_modes = ['drive', 'transit']
+        elif transfer_text:
+            segment_modes = [mode, mode]
+        else:
+            segment_modes = [mode]
+
+    if len(location_texts) < 2:
         metrics_store.increment('route_plans.validation_failed_total')
-        return jsonify({'error': 'start_address and destination_address are required'}), 400
+        return jsonify({'error': 'locations must contain at least 2 addresses'}), 400
 
-    if mode not in {'drive', 'transit', 'mixed'}:
+    if len(segment_modes) != len(location_texts) - 1:
         metrics_store.increment('route_plans.validation_failed_total')
-        return jsonify({'error': 'invalid mode'}), 400
+        return jsonify({'error': 'modes length must equal locations length minus one'}), 400
 
-    if drive_part not in {'first', 'second', None}:
+    if any(mode not in {'drive', 'transit'} for mode in segment_modes):
         metrics_store.increment('route_plans.validation_failed_total')
-        return jsonify({'error': 'invalid drive_part'}), 400
+        return jsonify({'error': 'invalid mode in modes, only drive/transit allowed'}), 400
 
-    if mode == 'mixed' and not transfer_text:
-        metrics_store.increment('route_plans.validation_failed_total')
-        return jsonify({'error': 'transfer_address is required for mixed mode'}), 400
-
-    task_id = route_plan_gateway.create_route_plan(
-        start_text=start_text,
-        transfer_text=transfer_text,
-        destination_text=destination_text,
-        drive_part=drive_part,
-        mode=mode,
+    task_id = route_plan_gateway.create_route_plan_from_locations(
+        location_texts=location_texts,
+        segment_modes=segment_modes,
         arrive_time_raw=data.get('arrive_time'),
     )
 
     job_manager.trigger_route_processing(task_id)
 
     metrics_store.increment('route_plans.created_total')
-    metrics_store.increment(f'route_plans.mode.{mode}_total')
+    for mode in segment_modes:
+        metrics_store.increment(f'route_plans.mode.{mode}_total')
 
     return jsonify({'task_id': task_id}), 201
 

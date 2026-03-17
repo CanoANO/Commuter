@@ -6,9 +6,55 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import select, or_
 
 from components.database.session import SessionLocal
-from components.database.models import RouteTask, RouteResult, TaskStatus, TaskMode, DrivePart, Address
+from components.database.models import RouteTask, RouteResult, TaskStatus, Address
 
 class RoutePlanGateway:
+    @staticmethod
+    def _sanitize_segment_modes(segment_modes: list[str]) -> list[str]:
+        sanitized: list[str] = []
+        for item in segment_modes:
+            mode = (item or "").strip().lower()
+            if mode in {"drive", "transit"}:
+                sanitized.append(mode)
+        return sanitized
+
+    @staticmethod
+    def _normalize_segment_modes(
+        mode: str | None,
+        drive_part: str | None,
+        has_transfer: bool,
+    ) -> list[str]:
+        normalized_mode = (mode or "drive").strip().lower()
+        normalized_drive_part = (drive_part or "").strip().lower()
+
+        if not has_transfer:
+            return [normalized_mode if normalized_mode in {"drive", "transit"} else "drive"]
+
+        if normalized_mode == "mixed":
+            if normalized_drive_part == "second":
+                return ["transit", "drive"]
+            return ["drive", "transit"]
+
+        default_mode = normalized_mode if normalized_mode in {"drive", "transit"} else "drive"
+        return [default_mode, default_mode]
+
+    @staticmethod
+    def _derive_legacy_mode_fields(segment_modes: list[str]) -> tuple[str | None, str | None]:
+        cleaned = [(item or "").strip().lower() for item in (segment_modes or []) if (item or "").strip()]
+        if not cleaned:
+            return None, None
+
+        if len(cleaned) == 1:
+            return cleaned[0], None
+
+        if len(cleaned) == 2 and set(cleaned) == {"drive", "transit"}:
+            return "mixed", "first" if cleaned[0] == "drive" else "second"
+
+        if all(item == cleaned[0] for item in cleaned):
+            return cleaned[0], None
+
+        return None, None
+
     @staticmethod
     def _parse_arrive_time(arrive_time_raw: str | None) -> datetime | None:
         if not arrive_time_raw:
@@ -41,33 +87,51 @@ class RoutePlanGateway:
         mode: str | None,
         arrive_time_raw: str | None,
     ) -> str:
-        arrive_time = self._parse_arrive_time(arrive_time_raw)
+        location_texts = [start_text]
+        if transfer_text:
+            location_texts.append(transfer_text)
+        location_texts.append(destination_text)
 
+        segment_modes = self._normalize_segment_modes(
+            mode=mode,
+            drive_part=drive_part,
+            has_transfer=transfer_text is not None,
+        )
+        return self.create_route_plan_from_locations(
+            location_texts=location_texts,
+            segment_modes=segment_modes,
+            arrive_time_raw=arrive_time_raw,
+        )
+
+    def create_route_plan_from_locations(
+        self,
+        location_texts: list[str],
+        segment_modes: list[str],
+        arrive_time_raw: str | None,
+    ) -> str:
+        arrive_time = self._parse_arrive_time(arrive_time_raw)
         query_time = datetime.now(timezone.utc)
+        cleaned_locations = [(item or "").strip() for item in location_texts if (item or "").strip()]
+        cleaned_modes = self._sanitize_segment_modes(segment_modes)
+
+        if len(cleaned_locations) < 2:
+            raise ValueError("At least two locations are required")
+        if len(cleaned_modes) != len(cleaned_locations) - 1:
+            raise ValueError("segment_modes length must equal locations length minus one")
 
         session = SessionLocal()
         try:
-            start_address = Address(raw_text=start_text, lat=0.0, lng=0.0)
-            session.add(start_address)
-            session.flush()
-
-            transfer_address = None
-            if transfer_text:
-                transfer_address = Address(raw_text=transfer_text, lat=0.0, lng=0.0)
-                session.add(transfer_address)
+            location_ids: list[int] = []
+            for location_text in cleaned_locations:
+                address = Address(raw_text=location_text, lat=0.0, lng=0.0)
+                session.add(address)
                 session.flush()
-
-            destination_address = Address(raw_text=destination_text, lat=0.0, lng=0.0)
-            session.add(destination_address)
-            session.flush()
+                location_ids.append(address.id)
 
             task = RouteTask(
                 status=TaskStatus.PENDING,
-                start_address_id=start_address.id,
-                transfer_address_id=transfer_address.id if transfer_address else None,
-                destination_address_id=destination_address.id,
-                mode=TaskMode(mode) if mode else TaskMode.drive,
-                drive_part=DrivePart(drive_part) if drive_part else None,
+                locations=location_ids,
+                segment_modes=cleaned_modes,
                 arrive_time=arrive_time,
                 query_time=query_time,
                 error_message=None,
@@ -148,13 +212,28 @@ class RoutePlanGateway:
             if not task:
                 return None
 
+            locations = [int(location_id) for location_id in (task.locations or [])]
+            addresses = session.execute(
+                select(Address).where(Address.id.in_(locations))
+            ).scalars().all() if locations else []
+            address_by_id = {address.id: address for address in addresses}
+
+            ordered_texts: list[str | None] = []
+            for location_id in locations:
+                address = address_by_id.get(location_id)
+                ordered_texts.append(address.raw_text if address else None)
+            mode, drive_part = self._derive_legacy_mode_fields(task.segment_modes or [])
+
             return {
                 "task_id": str(task.id),
-                "start_text": task.start_address.raw_text if task.start_address else None,
-                "transfer_text": task.transfer_address.raw_text if task.transfer_address else None,
-                "destination_text": task.destination_address.raw_text if task.destination_address else None,
-                "drive_part": task.drive_part.value if task.drive_part else None,
-                "mode": task.mode.value if task.mode else None,
+                "locations": locations,
+                "location_texts": ordered_texts,
+                "segment_modes": task.segment_modes or [],
+                "start_text": ordered_texts[0] if len(ordered_texts) >= 1 else None,
+                "transfer_text": ordered_texts[1] if len(ordered_texts) >= 3 else None,
+                "destination_text": ordered_texts[-1] if ordered_texts else None,
+                "drive_part": drive_part,
+                "mode": mode,
                 "arrive_time": task.arrive_time,
                 "query_time": task.query_time,
             }
@@ -179,13 +258,14 @@ class RoutePlanGateway:
     def save_route_result(
         self,
         task_id: str,
-        start_lat: float,
-        start_lng: float,
-        destination_lat: float,
-        destination_lng: float,
-        transfer_lat: float | None,
-        transfer_lng: float | None,
         result_json: str,
+        location_points: list[dict[str, float]] | None = None,
+        start_lat: float | None = None,
+        start_lng: float | None = None,
+        destination_lat: float | None = None,
+        destination_lng: float | None = None,
+        transfer_lat: float | None = None,
+        transfer_lng: float | None = None,
     ) -> None:
         session = SessionLocal()
         try:
@@ -193,15 +273,39 @@ class RoutePlanGateway:
             if not task:
                 return
 
-            if task.start_address:
-                task.start_address.lat = start_lat
-                task.start_address.lng = start_lng
-            if task.transfer_address and transfer_lat is not None and transfer_lng is not None:
-                task.transfer_address.lat = transfer_lat
-                task.transfer_address.lng = transfer_lng
-            if task.destination_address:
-                task.destination_address.lat = destination_lat
-                task.destination_address.lng = destination_lng
+            location_ids = [int(location_id) for location_id in (task.locations or [])]
+            addresses = session.execute(
+                select(Address).where(Address.id.in_(location_ids))
+            ).scalars().all() if location_ids else []
+            address_by_id = {address.id: address for address in addresses}
+
+            if location_ids and location_points and len(location_points) == len(location_ids):
+                for index, location_id in enumerate(location_ids):
+                    address = address_by_id.get(location_id)
+                    point = location_points[index] or {}
+                    if not address:
+                        continue
+                    lat = point.get("lat")
+                    lng = point.get("lng")
+                    if isinstance(lat, (int, float)) and isinstance(lng, (int, float)):
+                        address.lat = float(lat)
+                        address.lng = float(lng)
+            elif location_ids:
+                start_address = address_by_id.get(location_ids[0])
+                if start_address and start_lat is not None and start_lng is not None:
+                    start_address.lat = start_lat
+                    start_address.lng = start_lng
+
+                destination_address = address_by_id.get(location_ids[-1])
+                if destination_address and destination_lat is not None and destination_lng is not None:
+                    destination_address.lat = destination_lat
+                    destination_address.lng = destination_lng
+
+                if len(location_ids) >= 3 and transfer_lat is not None and transfer_lng is not None:
+                    transfer_address = address_by_id.get(location_ids[1])
+                    if transfer_address:
+                        transfer_address.lat = transfer_lat
+                        transfer_address.lng = transfer_lng
 
             if task.result:
                 task.result.result_json = result_json

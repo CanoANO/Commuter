@@ -1,8 +1,8 @@
-def test_create_route_plan_requires_start_and_destination(client, mocked_plan_dependencies):
-    response = client.post("/route-plans", json={"start_address": "", "destination_address": ""})
+def test_create_route_plan_requires_at_least_two_locations(client, mocked_plan_dependencies):
+    response = client.post("/route-plans", json={"locations": ["A"], "modes": []})
 
     assert response.status_code == 400
-    assert response.get_json()["error"] == "start_address and destination_address are required"
+    assert response.get_json()["error"] == "locations must contain at least 2 addresses"
     mocked_plan_dependencies["metrics_increment"].assert_any_call("route_plans.requests_total")
     mocked_plan_dependencies["metrics_increment"].assert_any_call("route_plans.validation_failed_total")
 
@@ -10,42 +10,34 @@ def test_create_route_plan_requires_start_and_destination(client, mocked_plan_de
 def test_create_route_plan_rejects_invalid_mode(client, mocked_plan_dependencies):
     response = client.post(
         "/route-plans",
-        json={"start_address": "A", "destination_address": "B", "mode": "bike"},
+        json={"locations": ["A", "B"], "modes": ["bike"]},
     )
 
     assert response.status_code == 400
-    assert response.get_json()["error"] == "invalid mode"
+    assert response.get_json()["error"] == "invalid mode in modes, only drive/transit allowed"
 
 
-def test_create_route_plan_rejects_invalid_drive_part(client, mocked_plan_dependencies):
+def test_create_route_plan_rejects_mismatched_modes_count(client, mocked_plan_dependencies):
     response = client.post(
         "/route-plans",
-        json={
-            "start_address": "A",
-            "destination_address": "B",
-            "mode": "mixed",
-            "transfer_address": "T",
-            "drive_part": "third",
-        },
+        json={"locations": ["A", "B", "C"], "modes": ["drive"]},
     )
 
     assert response.status_code == 400
-    assert response.get_json()["error"] == "invalid drive_part"
+    assert response.get_json()["error"] == "modes length must equal locations length minus one"
 
 
-def test_create_route_plan_requires_transfer_for_mixed(client, mocked_plan_dependencies):
+def test_create_route_plan_accepts_valid_multidest_payload(client, mocked_plan_dependencies):
+    mocked_plan_dependencies["create_route_plan_from_locations"].return_value = "task-xyz"
+
     response = client.post(
         "/route-plans",
-        json={
-            "start_address": "A",
-            "destination_address": "B",
-            "mode": "mixed",
-            "drive_part": "first",
-        },
+        json={"locations": ["A", "B", "C"], "modes": ["drive", "transit"]},
     )
 
-    assert response.status_code == 400
-    assert response.get_json()["error"] == "transfer_address is required for mixed mode"
+    assert response.status_code == 201
+    assert response.get_json()["task_id"] == "task-xyz"
+    mocked_plan_dependencies["create_route_plan_from_locations"].assert_called_once()
 
 
 def test_get_route_plan_returns_404_when_task_missing(client, mocked_plan_dependencies):
