@@ -114,7 +114,30 @@ def _get_route_plan_db_snapshot() -> dict[str, object]:
             )
 
             mode_rows = conn.execute(
-                text("SELECT mode, COUNT(*)::int AS count FROM route_tasks GROUP BY mode")
+                text(
+                    """
+                    SELECT mode_group AS mode, COUNT(*)::int AS count
+                    FROM (
+                        SELECT
+                            CASE
+                                WHEN rt.segment_modes IS NULL
+                                     OR json_array_length(rt.segment_modes) = 0
+                                    THEN 'drive'
+                                WHEN stats.distinct_modes = 1
+                                    THEN stats.first_mode
+                                ELSE 'mixed'
+                            END AS mode_group
+                        FROM route_tasks rt
+                        LEFT JOIN LATERAL (
+                            SELECT
+                                COUNT(DISTINCT mode_text)::int AS distinct_modes,
+                                MIN(mode_text) AS first_mode
+                            FROM json_array_elements_text(COALESCE(rt.segment_modes, '[]'::json)) AS mode_text
+                        ) AS stats ON TRUE
+                    ) grouped
+                    GROUP BY mode_group
+                    """
+                )
             ).mappings()
             by_mode = {"drive": 0, "transit": 0, "mixed": 0}
             for row in mode_rows:
@@ -185,7 +208,8 @@ def metrics():
 
     created_total = all_metrics.get("route_plans.created_total", 0)
     requests_total = all_metrics.get("route_plans.requests_total", 0)
-    db_total = db_snapshot.get("total", 0) if db_snapshot.get("available") else 0
+    raw_db_total = db_snapshot.get("total", 0) if db_snapshot.get("available") else 0
+    db_total = int(raw_db_total) if isinstance(raw_db_total, (int, float, str)) else 0
 
     payload = {
         "route_plans": {
