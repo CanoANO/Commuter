@@ -343,6 +343,10 @@
             border-style: dashed;
         }
 
+        .stop-item.drag-over {
+            border-color: #111;
+        }
+
         .stop-head {
             display: flex;
             align-items: center;
@@ -411,6 +415,7 @@
             font-family: inherit;
             line-height: 1;
             position: relative;
+            touch-action: none;
         }
 
         .drag-handle::before {
@@ -553,6 +558,8 @@
         const stopsList = document.getElementById('stopsList');
         let dragSourceIndex = null;
         let dragHandleIndex = null;
+        let touchDragSourceIndex = null;
+        let touchDragTargetIndex = null;
         let isComposingInput = false;
         const historySection = document.querySelector('.history-section');
         const historyList = document.getElementById('historyList');
@@ -716,6 +723,26 @@
             addLocation(rawInput);
         }
 
+        function moveStop(fromIndex, toIndex) {
+            if (fromIndex === null || toIndex === null || fromIndex === toIndex) {
+                return;
+            }
+            const [moved] = formState.stops.splice(fromIndex, 1);
+            formState.stops.splice(toIndex, 0, moved);
+            ensureModesLength();
+            renderDynamicForm();
+        }
+
+        function clearTouchDragState() {
+            stopsList.querySelectorAll('.stop-item').forEach((node) => {
+                node.classList.remove('dragging');
+                node.classList.remove('drag-over');
+            });
+            touchDragSourceIndex = null;
+            touchDragTargetIndex = null;
+            dragHandleIndex = null;
+        }
+
         function renderStops() {
             ensureModesLength();
             let html = '';
@@ -804,11 +831,20 @@
                     if (dragSourceIndex === null || dragSourceIndex === targetIndex) {
                         return;
                     }
-                    const [moved] = formState.stops.splice(dragSourceIndex, 1);
-                    formState.stops.splice(targetIndex, 0, moved);
-                    ensureModesLength();
-                    renderDynamicForm();
+                    moveStop(dragSourceIndex, targetIndex);
                 });
+                item.addEventListener('touchstart', (event) => {
+                    const isHandle = event.target instanceof Element && event.target.closest('[data-drag-handle]');
+                    if (!isHandle) {
+                        return;
+                    }
+                    const currentIndex = Number(item.getAttribute('data-stop-index'));
+                    dragHandleIndex = currentIndex;
+                    touchDragSourceIndex = currentIndex;
+                    touchDragTargetIndex = currentIndex;
+                    item.classList.add('dragging');
+                    event.preventDefault();
+                }, { passive: false });
             });
         }
 
@@ -877,6 +913,47 @@
         addLocationBtn.addEventListener('click', () => {
             commitAddressInput();
             newLocationInput.focus();
+        });
+
+        document.addEventListener('touchmove', (event) => {
+            if (touchDragSourceIndex === null) {
+                return;
+            }
+
+            const touch = event.touches?.[0];
+            if (!touch) {
+                return;
+            }
+
+            event.preventDefault();
+            const element = document.elementFromPoint(touch.clientX, touch.clientY);
+            const targetItem = element instanceof Element ? element.closest('[data-stop-index]') : null;
+
+            stopsList.querySelectorAll('.stop-item').forEach((node) => node.classList.remove('drag-over'));
+            if (!targetItem) {
+                touchDragTargetIndex = null;
+                return;
+            }
+
+            targetItem.classList.add('drag-over');
+            touchDragTargetIndex = Number(targetItem.getAttribute('data-stop-index'));
+        }, { passive: false });
+
+        document.addEventListener('touchend', () => {
+            if (touchDragSourceIndex === null) {
+                return;
+            }
+            const sourceIndex = touchDragSourceIndex;
+            const targetIndex = touchDragTargetIndex;
+            clearTouchDragState();
+            moveStop(sourceIndex, targetIndex);
+        });
+
+        document.addEventListener('touchcancel', () => {
+            if (touchDragSourceIndex === null) {
+                return;
+            }
+            clearTouchDragState();
         });
 
         form.addEventListener('submit', async (e) => {
